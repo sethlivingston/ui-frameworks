@@ -1,13 +1,17 @@
 ---
-name: Laravel Livewire
-category: Full Framework
-type: Server-Side Framework
-docs_url: https://livewire.laravel.com/docs/
-github_url: https://github.com/livewire/livewire
-mcp_servers: null
-implementation_language: PHP
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Laravel Livewire"
+category: "full-framework"
+github_url: "https://github.com/livewire/livewire"
+docs_url: "https://livewire.laravel.com/docs/"
+implementation_language: "PHP"
+status: "active"
 ai_friendliness_score: 8
+reusability_score: 7.5
+maintainability_score: 7.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Laravel Livewire

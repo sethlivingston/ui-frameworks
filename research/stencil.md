@@ -1,13 +1,17 @@
 ---
-name: Stencil
-category: Web Components Compiler
-type: Compiler
-docs_url: https://stenciljs.com
-github_url: https://github.com/ionic/stencil
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Stencil"
+category: "web-components-compiler"
+github_url: "https://github.com/ionic/stencil"
+docs_url: "https://stenciljs.com"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 7.5
+reusability_score: 9.5
+maintainability_score: 8.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Stencil

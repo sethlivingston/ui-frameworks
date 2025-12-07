@@ -1,13 +1,17 @@
 ---
-name: Qwik
-category: Framework
-type: Resumable Framework
-docs_url: https://qwik.dev
-github_url: https://github.com/QwikDev/qwik
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Qwik"
+category: "full-framework"
+github_url: "https://github.com/QwikDev/qwik"
+docs_url: "https://qwik.dev"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 8
+reusability_score: 7.5
+maintainability_score: 8
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Qwik

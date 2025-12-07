@@ -1,13 +1,17 @@
 ---
-name: Phoenix LiveView
-category: Full Framework
-type: Server-Side Framework
-docs_url: https://hexdocs.pm/phoenix_live_view/
-github_url: https://github.com/phoenixframework/phoenix_live_view
-mcp_servers: null
-implementation_language: Elixir
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Phoenix LiveView"
+category: "full-framework"
+github_url: "https://github.com/phoenixframework/phoenix_live_view"
+docs_url: "https://hexdocs.pm/phoenix_live_view/"
+implementation_language: "Elixir"
+status: "active"
 ai_friendliness_score: 9.5
+reusability_score: 9
+maintainability_score: 9
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Phoenix LiveView

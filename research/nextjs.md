@@ -1,13 +1,17 @@
 ---
-name: Next.js
-category: Meta-Framework
-type: React Framework
-docs_url: https://nextjs.org
-github_url: https://github.com/vercel/next.js
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Next.js"
+category: "meta-framework"
+github_url: "https://github.com/vercel/next.js"
+docs_url: "https://nextjs.org"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 7
+reusability_score: 8
+maintainability_score: 7.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Next.js

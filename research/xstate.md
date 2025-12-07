@@ -1,13 +1,17 @@
 ---
-name: XState
-category: State Management Library
-type: State Machine Library
-docs_url: https://stately.ai/docs/xstate
-github_url: https://github.com/statelyai/xstate
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "XState"
+category: "state-library"
+github_url: "https://github.com/statelyai/xstate"
+docs_url: "https://stately.ai/docs/xstate"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 7
+reusability_score: 9
+maintainability_score: 9
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # XState

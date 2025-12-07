@@ -1,13 +1,17 @@
 ---
-name: MobX
-category: State Management Library
-type: React State Management
-docs_url: https://mobx.js.org
-github_url: https://github.com/mobxjs/mobx
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "MobX"
+category: "state-library"
+github_url: "https://github.com/mobxjs/mobx"
+docs_url: "https://mobx.js.org"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 7.5
+reusability_score: 7.5
+maintainability_score: 7.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # MobX

@@ -1,13 +1,17 @@
 ---
-name: Alpine.js
-category: Library
-type: Progressive Enhancement Framework
-docs_url: https://alpinejs.dev
-github_url: https://github.com/alpinejs/alpine
-mcp_servers: null
-implementation_language: JavaScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Alpine.js"
+category: "utility-library"
+github_url: "https://github.com/alpinejs/alpine"
+docs_url: "https://alpinejs.dev"
+implementation_language: "JavaScript"
+status: "active"
 ai_friendliness_score: 8
+reusability_score: 6
+maintainability_score: 7
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Alpine.js

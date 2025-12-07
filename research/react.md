@@ -1,43 +1,29 @@
 ---
-framework: "React"
-version: "19.2.1"
+name: "React"
 category: "full-framework"
-
-# Links & Resources
 github_url: "https://github.com/facebook/react"
 docs_url: "https://react.dev"
-npm_package: "react"
-mcp_server:
-  available: false
-  url: null
-  party: null
-
-# Technical metadata
 implementation_language: "JavaScript"
+status: "active"
+ai_friendliness_score: null
+reusability_score: 9
+maintainability_score: 7.5
+version: "19.2.1"
+npm_package: "react"
 typescript_support: "types-package"
 license: "MIT"
 runtime: "browser"
-
-# Capabilities
 capabilities:
   state_management: true
   rendering: true
   event_handling: true
-
-# Classification (for searching)
 paradigm: "declarative"
 state_model: "immutable"
 rendering_strategy: "virtual-dom"
-
-# Maintenance
 maintainer: "Meta"
 first_released: "2013"
-status: "active"
-
-# Review metadata
 reviewed_date: "2025-12-06"
 reviewed_by_model: "Claude Sonnet 4.5"
-reviewer_notes: "First full-framework review covering state, rendering, and events. React 19 includes Server Components, Actions API, and production-ready compiler."
 ---
 
 # React

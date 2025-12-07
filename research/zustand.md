@@ -1,13 +1,17 @@
 ---
-name: Zustand
-category: State Management Library
-type: React State Management
-docs_url: https://zustand.docs.pmnd.rs
-github_url: https://github.com/pmndrs/zustand
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Zustand"
+category: "state-library"
+github_url: "https://github.com/pmndrs/zustand"
+docs_url: "https://zustand.docs.pmnd.rs"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 8.5
+reusability_score: 9
+maintainability_score: 9
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Zustand

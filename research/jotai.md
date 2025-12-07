@@ -1,43 +1,28 @@
 ---
-framework: "Jotai"
-version: "2.15.2"
+name: "Jotai"
 category: "state-library"
-
-# Links & Resources
 github_url: "https://github.com/pmndrs/jotai"
 docs_url: "https://jotai.org"
-npm_package: "jotai"
-mcp_server:
-  available: false
-  url: null
-  party: null
-
-# Technical metadata
 implementation_language: "TypeScript"
+status: "active"
+ai_friendliness_score: null
+reusability_score: 9.5
+maintainability_score: 9
+version: "2.15.2"
+npm_package: "jotai"
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
-
-# Capabilities
 capabilities:
   state_management: true
   rendering: false
   event_handling: false
-
-# Classification (for searching)
 paradigm: "reactive"
 state_model: "atoms"
-rendering_strategy: null
-
-# Maintenance
 maintainer: "Poimandres"
 first_released: "2020"
-status: "active"
-
-# Review metadata
 reviewed_date: "2025-12-06"
 reviewed_by_model: "Claude Sonnet 4.5"
-reviewer_notes: "First framework review - comprehensive analysis of atomic state management approach"
 ---
 
 # Jotai

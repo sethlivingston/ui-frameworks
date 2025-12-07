@@ -1,0 +1,22 @@
+{
+  "name": "ui-frameworks-research",
+  "version": "1.0.0",
+  "description": "Research project analyzing UI frameworks for AI-assisted development",
+  "type": "module",
+  "scripts": {
+    "index": "node scripts/build-index.js",
+    "extract-scores": "node scripts/extract-scores.js",
+    "normalize": "node scripts/normalize-frontmatter.js",
+    "sync": "node scripts/sync-frontmatter.js"
+  },
+  "keywords": [
+    "ui-frameworks",
+    "research",
+    "ai-assisted-development"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

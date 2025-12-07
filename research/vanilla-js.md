@@ -1,43 +1,28 @@
 ---
-framework: "Vanilla JavaScript"
-version: "ES2024"
+name: "Vanilla JavaScript"
 category: "no-framework"
-
-# Links & Resources
 github_url: null
 docs_url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
-npm_package: null
-mcp_server:
-  available: false
-  url: null
-  party: null
-
-# Technical metadata
 implementation_language: "JavaScript"
+status: "active"
+ai_friendliness_score: null
+reusability_score: 7
+maintainability_score: 6
+version: "ES2024"
 typescript_support: "native"
 license: "N/A"
 runtime: "browser"
-
-# Capabilities
 capabilities:
   state_management: true
   rendering: true
   event_handling: true
-
-# Classification (for searching)
 paradigm: "imperative"
 state_model: "mutable"
 rendering_strategy: "direct-dom"
-
-# Maintenance
 maintainer: "W3C/WHATWG/TC39"
 first_released: "1995"
-status: "active"
-
-# Review metadata
 reviewed_date: "2025-12-06"
 reviewed_by_model: "Claude Sonnet 4.5"
-reviewer_notes: "The no-framework baseline. Modern ES6+ JavaScript with native DOM APIs. This is what all frameworks are built on top of and trying to improve."
 ---
 
 # Vanilla JavaScript

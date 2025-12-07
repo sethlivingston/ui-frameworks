@@ -1,13 +1,17 @@
 ---
-name: Astro
-category: Meta-Framework
-type: Multi-Framework
-docs_url: https://astro.build
-github_url: https://github.com/withastro/astro
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Astro"
+category: "meta-framework"
+github_url: "https://github.com/withastro/astro"
+docs_url: "https://astro.build"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 8.5
+reusability_score: 9
+maintainability_score: 8.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Astro

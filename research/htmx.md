@@ -1,13 +1,17 @@
 ---
-name: htmx
-category: Library
-type: Hypermedia/Server-Driven UI
-docs_url: https://htmx.org/docs/
-github_url: https://github.com/bigskysoftware/htmx
-mcp_servers: null
-implementation_language: JavaScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "htmx"
+category: "utility-library"
+github_url: "https://github.com/bigskysoftware/htmx"
+docs_url: "https://htmx.org/docs/"
+implementation_language: "JavaScript"
+status: "active"
 ai_friendliness_score: 8.5
+reusability_score: 7
+maintainability_score: 8.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # htmx

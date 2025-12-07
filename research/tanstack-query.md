@@ -1,43 +1,28 @@
 ---
-framework: "TanStack Query"
-version: "5.90.12"
+name: "TanStack Query"
 category: "state-library"
-
-# Links & Resources
 github_url: "https://github.com/TanStack/query"
 docs_url: "https://tanstack.com/query/latest"
-npm_package: "@tanstack/react-query"
-mcp_server:
-  available: false
-  url: null
-  party: null
-
-# Technical metadata
 implementation_language: "TypeScript"
+status: "active"
+ai_friendliness_score: null
+reusability_score: 9
+maintainability_score: 8.5
+version: "5.90.12"
+npm_package: "@tanstack/react-query"
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
-
-# Capabilities
 capabilities:
   state_management: true
   rendering: false
   event_handling: false
-
-# Classification (for searching)
 paradigm: "declarative"
 state_model: "queries"
-rendering_strategy: null
-
-# Maintenance
 maintainer: "TanStack"
 first_released: "2019"
-status: "active"
-
-# Review metadata
 reviewed_date: "2025-12-06"
 reviewed_by_model: "Claude Sonnet 4.5"
-reviewer_notes: "Focused on async/server state management - different category from general state libraries"
 ---
 
 # TanStack Query

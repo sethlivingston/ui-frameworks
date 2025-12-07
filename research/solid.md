@@ -1,43 +1,29 @@
 ---
-framework: "Solid"
-version: "1.8.x"
+name: "Solid"
 category: "full-framework"
-
-# Links & Resources
 github_url: "https://github.com/solidjs/solid"
 docs_url: "https://www.solidjs.com"
-npm_package: "solid-js"
-mcp_server:
-  available: false
-  url: null
-  party: null
-
-# Technical metadata
 implementation_language: "TypeScript"
+status: "active"
+ai_friendliness_score: null
+reusability_score: 8
+maintainability_score: 8.5
+version: "1.8.x"
+npm_package: "solid-js"
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
-
-# Capabilities
 capabilities:
   state_management: true
   rendering: true
   event_handling: true
-
-# Classification (for searching)
 paradigm: "reactive"
 state_model: "signals"
 rendering_strategy: "compiler"
-
-# Maintenance
 maintainer: "Ryan Carniato"
 first_released: "2018"
-status: "active"
-
-# Review metadata
 reviewed_date: "2025-12-06"
 reviewed_by_model: "Claude Sonnet 4.5"
-reviewer_notes: "Fine-grained reactive framework with signals. JSX that compiles to direct DOM manipulation (not VDOM). Maximum performance through precise reactivity. 90% developer satisfaction in 2025 State of JS survey."
 ---
 
 # Solid

@@ -1,13 +1,17 @@
 ---
-name: Angular
-category: Full Framework
-type: Client-Side Framework
-docs_url: https://angular.dev
-github_url: https://github.com/angular/angular
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Angular"
+category: "full-framework"
+github_url: "https://github.com/angular/angular"
+docs_url: "https://angular.dev"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 7
+reusability_score: 7.5
+maintainability_score: 7.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Angular

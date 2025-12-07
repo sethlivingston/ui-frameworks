@@ -1,13 +1,17 @@
 ---
-name: Lit
-category: Web Components Library
-type: Client-Side Framework
-docs_url: https://lit.dev
-github_url: https://github.com/lit/lit
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Lit"
+category: "web-components-library"
+github_url: "https://github.com/lit/lit"
+docs_url: "https://lit.dev"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 7.5
+reusability_score: 9.5
+maintainability_score: 9
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Lit

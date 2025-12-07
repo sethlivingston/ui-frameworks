@@ -1,43 +1,29 @@
 ---
-framework: "Svelte"
-version: "5.45.6"
+name: "Svelte"
 category: "full-framework"
-
-# Links & Resources
 github_url: "https://github.com/sveltejs/svelte"
 docs_url: "https://svelte.dev"
-npm_package: "svelte"
-mcp_server:
-  available: false
-  url: null
-  party: null
-
-# Technical metadata
 implementation_language: "JavaScript"
+status: "active"
+ai_friendliness_score: null
+reusability_score: 9
+maintainability_score: 9.5
+version: "5.45.6"
+npm_package: "svelte"
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
-
-# Capabilities
 capabilities:
   state_management: true
   rendering: true
   event_handling: true
-
-# Classification (for searching)
 paradigm: "reactive"
 state_model: "signals"
 rendering_strategy: "compiler"
-
-# Maintenance
 maintainer: "Rich Harris / Community"
 first_released: "2016"
-status: "active"
-
-# Review metadata
 reviewed_date: "2025-12-06"
 reviewed_by_model: "Claude Sonnet 4.5"
-reviewer_notes: "Compiler-first framework with signals-based reactivity. Svelte 5 introduces runes ($state, $derived, $effect) replacing older reactive declarations. No Virtual DOM - compiles to direct DOM manipulation."
 ---
 
 # Svelte

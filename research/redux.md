@@ -1,13 +1,17 @@
 ---
-name: Redux (Redux Toolkit)
-category: State Management Library
-type: React State Management
-docs_url: https://redux-toolkit.js.org
-github_url: https://github.com/reduxjs/redux-toolkit
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Redux (Redux Toolkit)"
+category: "state-library"
+github_url: "https://github.com/reduxjs/redux-toolkit"
+docs_url: "https://redux-toolkit.js.org"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 7.5
+reusability_score: 8.5
+maintainability_score: 8.5
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Redux (Redux Toolkit)

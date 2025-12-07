@@ -1,13 +1,17 @@
 ---
-name: Remix
-category: Meta-Framework
-type: React Framework
-docs_url: https://remix.run
-github_url: https://github.com/remix-run/remix
-mcp_servers: null
-implementation_language: TypeScript
-reviewed_with_model: claude-sonnet-4-5-20250929
+name: "Remix"
+category: "meta-framework"
+github_url: "https://github.com/remix-run/remix"
+docs_url: "https://remix.run"
+implementation_language: "TypeScript"
+status: "active"
 ai_friendliness_score: 8.5
+reusability_score: 8
+maintainability_score: 9
+capabilities:
+  state_management: false
+  rendering: false
+  event_handling: false
 ---
 
 # Remix

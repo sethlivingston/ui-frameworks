@@ -1,43 +1,29 @@
 ---
-framework: "Vue"
-version: "3.5.25"
+name: "Vue"
 category: "full-framework"
-
-# Links & Resources
 github_url: "https://github.com/vuejs/core"
 docs_url: "https://vuejs.org"
-npm_package: "vue"
-mcp_server:
-  available: false
-  url: null
-  party: null
-
-# Technical metadata
 implementation_language: "TypeScript"
+status: "active"
+ai_friendliness_score: null
+reusability_score: 8.5
+maintainability_score: 8.5
+version: "3.5.25"
+npm_package: "vue"
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
-
-# Capabilities
 capabilities:
   state_management: true
   rendering: true
   event_handling: true
-
-# Classification (for searching)
 paradigm: "reactive"
 state_model: "mutable"
 rendering_strategy: "virtual-dom"
-
-# Maintenance
 maintainer: "Evan You"
 first_released: "2014"
-status: "active"
-
-# Review metadata
 reviewed_date: "2025-12-06"
 reviewed_by_model: "Claude Sonnet 4.5"
-reviewer_notes: "Full framework review. Vue 3 uses Composition API, Proxy-based reactivity, and template-based rendering. Pinia is the official state management library."
 ---
 
 # Vue

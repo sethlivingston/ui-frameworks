@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UI Framework Review",
+  "description": "YAML frontmatter schema for comprehensive UI framework/library reviews",
+  "type": "object",
+  "required": [
+    "name",
+    "category",
+    "github_url",
+    "docs_url",
+    "implementation_language",
+    "status",
+    "ai_friendliness_score",
+    "reusability_score",
+    "maintainability_score"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Official name of the framework, library, tool, or language",
+      "examples": ["React", "Vue", "Svelte", "Alpine.js", "TanStack Query", "Elm"]
+    },
+    "version": {
+      "type": ["string", "null"],
+      "description": "Current/reviewed version number",
+      "examples": ["19.2.1", "3.4.0", "5.0.0", null]
+    },
+    "category": {
+      "type": "string",
+      "description": "Classification (use kebab-case enum values). Maps free-text values to standard enum.",
+      "enum": [
+        "full-framework",
+        "meta-framework",
+        "state-library",
+        "rendering-library",
+        "reactive-primitive",
+        "web-components-library",
+        "web-components-compiler",
+        "server-framework",
+        "utility-library",
+        "language",
+        "no-framework"
+      ]
+    },
+    "type": {
+      "type": ["string", "null"],
+      "description": "More specific type classification",
+      "examples": ["React Framework", "State Machine Library", "Progressive Enhancement Framework"]
+    },
+    "github_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "GitHub repository URL"
+    },
+    "docs_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Official documentation URL"
+    },
+    "npm_package": {
+      "type": ["string", "null"],
+      "description": "NPM package name (if applicable)",
+      "examples": ["react", "vue", "svelte", null]
+    },
+    "mcp_server": {
+      "type": ["object", "null"],
+      "description": "Model Context Protocol server information",
+      "properties": {
+        "available": {
+          "type": "boolean",
+          "description": "Whether an MCP server exists for this framework"
+        },
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "MCP server URL or repository"
+        },
+        "party": {
+          "type": ["string", "null"],
+          "enum": ["first-party", "third-party", "community", null],
+          "description": "Who maintains the MCP server"
+        }
+      }
+    },
+    "implementation_language": {
+      "type": "string",
+      "description": "Primary implementation language",
+      "enum": ["JavaScript", "TypeScript", "Rust", "Go", "Python", "Java", "Elixir", "PHP", "Haskell"]
+    },
+    "typescript_support": {
+      "type": ["string", "null"],
+      "description": "TypeScript support level",
+      "enum": ["native", "types-package", "community-types", "none", null]
+    },
+    "license": {
+      "type": ["string", "null"],
+      "description": "Open source license",
+      "examples": ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", null]
+    },
+    "runtime": {
+      "type": ["string", "null"],
+      "description": "Where the framework can run",
+      "enum": ["browser", "node", "both", "deno", "bun", "server", null]
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "What aspects of UI development this framework handles",
+      "properties": {
+        "state_management": {
+          "type": "boolean",
+          "description": "Includes state management features"
+        },
+        "rendering": {
+          "type": "boolean",
+          "description": "Includes rendering/DOM manipulation"
+        },
+        "event_handling": {
+          "type": "boolean",
+          "description": "Includes event system"
+        }
+      }
+    },
+    "paradigm": {
+      "type": ["string", "null"],
+      "description": "Programming paradigm",
+      "enum": ["declarative", "reactive", "imperative", "functional", null]
+    },
+    "state_model": {
+      "type": ["string", "null"],
+      "description": "How state is managed",
+      "enum": [
+        "immutable",
+        "mutable",
+        "signals",
+        "observables",
+        "atoms",
+        "reducers",
+        "queries",
+        "reactive-properties",
+        "streams",
+        null
+      ]
+    },
+    "rendering_strategy": {
+      "type": ["string", "null"],
+      "description": "How the framework renders to the DOM",
+      "enum": [
+        "virtual-dom",
+        "fine-grained",
+        "compiler",
+        "direct-dom",
+        "server-side",
+        "hydration",
+        "resumable",
+        null
+      ]
+    },
+    "maintainer": {
+      "type": ["string", "null"],
+      "description": "Primary maintainer or organization",
+      "examples": ["Meta", "Vercel", "The Vue Team", "Community", null]
+    },
+    "first_released": {
+      "type": ["string", "null"],
+      "description": "Year of first release",
+      "examples": ["2013", "2014", "2016", null]
+    },
+    "status": {
+      "type": ["string", "null"],
+      "description": "Current maintenance status",
+      "enum": ["active", "maintenance", "deprecated", "archived", null]
+    },
+    "ai_friendliness_score": {
+      "type": ["number", "null"],
+      "description": "AI-friendliness score (0-10)",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "reusability_score": {
+      "type": ["number", "null"],
+      "description": "Component/state reusability score (0-10)",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "maintainability_score": {
+      "type": ["number", "null"],
+      "description": "Code maintainability score (0-10)",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "reviewed_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date review was completed (YYYY-MM-DD)",
+      "examples": ["2025-12-06", "2025-12-07"]
+    },
+    "reviewed_by_model": {
+      "type": ["string", "null"],
+      "description": "AI model used for review",
+      "examples": ["Claude Sonnet 4.5", "Claude Opus 4.5", "GPT-4"]
+    },
+    "reviewer_notes": {
+      "type": ["string", "null"],
+      "description": "Optional notes about the review or framework"
+    }
+  }
+}
