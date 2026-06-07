@@ -290,6 +290,35 @@
     "reviewed_by_model": null
   },
   {
+    "file": "nuxt",
+    "name": "Nuxt",
+    "version": null,
+    "category": "meta-framework",
+    "github_url": "https://github.com/nuxt/nuxt",
+    "docs_url": "https://nuxt.com",
+    "npm_package": null,
+    "implementation_language": "TypeScript",
+    "typescript_support": null,
+    "license": null,
+    "runtime": null,
+    "capabilities": {
+      "state_management": false,
+      "rendering": false,
+      "event_handling": false
+    },
+    "paradigm": null,
+    "state_model": null,
+    "rendering_strategy": null,
+    "maintainer": null,
+    "first_released": null,
+    "status": "active",
+    "ai_friendliness_score": 7,
+    "reusability_score": 8,
+    "maintainability_score": 8,
+    "reviewed_date": null,
+    "reviewed_by_model": null
+  },
+  {
     "file": "phoenix",
     "name": "Phoenix LiveView",
     "version": null,

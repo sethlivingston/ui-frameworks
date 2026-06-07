@@ -3,7 +3,7 @@
 This is the synthesis this whole research project was building toward: given everything we've learned reviewing the frameworks and libraries in `/research` and tracking how frontier LLMs have evolved, **which of these would you actually want an AI agent building your UI in today?**
 
 > **Ranking version:** v1 — 2026-06-07
-> **Inputs:** The 24 reviews in `/research`, their frontmatter scores, and the 2026 frontier-LLM-capability findings synthesized in [NEXT-GEN-FRAMEWORK.md](./NEXT-GEN-FRAMEWORK.md).
+> **Inputs:** The reviews in [`/research`](./research/), their frontmatter scores, and the 2026 frontier-LLM-capability findings synthesized in [NEXT-GEN-FRAMEWORK.md](./NEXT-GEN-FRAMEWORK.md).
 > **Reviewed by:** Claude Sonnet 4.6
 
 ---
@@ -83,15 +83,16 @@ Each framework/library is scored 0–10 on five factors, then combined into a we
 | 7 | **Next.js** | App framework | **7.55** | 7.0 | 9.5 | 6.5 | 6.0 | 9.0 |
 | 7 | **Angular** | App framework | **7.55** | 7.0 | 9.0 | 8.5 | 3.5 | 9.5 |
 | 9 | **Remix** | App framework | **7.45** | 8.5 | 6.0 | 8.0 | 8.5 | 5.5 |
-| 10 | **React** | Rendering library | **7.29** | 7.7 | 10.0 | 7.0 | 6.5 | 4.0 |
-| 11 | **Solid** | Rendering library | **7.18** | 8.5 | 5.0 | 8.0 | 9.0 | 4.5 |
-| 12 | **Laravel Livewire** | App framework | **7.15** | 8.0 | 6.5 | 6.0 | 6.0 | 9.0 |
-| 13 | **htmx** | Enhancement utility | **6.93** | 8.5 | 5.5 | 4.0 | 9.5 | 7.0 |
-| 14 | **Qwik** | App framework | **6.85** | 8.0 | 4.0 | 7.0 | 8.0 | 7.0 |
-| 15 | **Stencil** | Web-components compiler | **6.73** | 7.5 | 4.0 | 7.5 | 6.5 | 8.0 |
-| 16 | **Lit** | Web-components library | **6.53** | 7.5 | 5.0 | 7.0 | 7.0 | 5.5 |
-| 17 | **Alpine.js** | Enhancement utility | **6.30** | 8.0 | 5.0 | 4.0 | 10.0 | 4.0 |
-| 18 | **Vanilla JS** | Baseline | **5.13** | 6.0 | 9.0 | 5.0 | 2.5 | 1.0 |
+| 10 | **Nuxt** | App framework | **7.33** | 7.0 | 7.0 | 7.5 | 8.0 | 7.5 |
+| 11 | **React** | Rendering library | **7.29** | 7.7 | 10.0 | 7.0 | 6.5 | 4.0 |
+| 12 | **Solid** | Rendering library | **7.18** | 8.5 | 5.0 | 8.0 | 9.0 | 4.5 |
+| 13 | **Laravel Livewire** | App framework | **7.15** | 8.0 | 6.5 | 6.0 | 6.0 | 9.0 |
+| 14 | **htmx** | Enhancement utility | **6.93** | 8.5 | 5.5 | 4.0 | 9.5 | 7.0 |
+| 15 | **Qwik** | App framework | **6.85** | 8.0 | 4.0 | 7.0 | 8.0 | 7.0 |
+| 16 | **Stencil** | Web-components compiler | **6.73** | 7.5 | 4.0 | 7.5 | 6.5 | 8.0 |
+| 17 | **Lit** | Web-components library | **6.53** | 7.5 | 5.0 | 7.0 | 7.0 | 5.5 |
+| 18 | **Alpine.js** | Enhancement utility | **6.30** | 8.0 | 5.0 | 4.0 | 10.0 | 4.0 |
+| 19 | **Vanilla JS** | Baseline | **5.13** | 6.0 | 9.0 | 5.0 | 2.5 | 1.0 |
 
 ### Notes on the top 5
 
