@@ -103,6 +103,21 @@ rg "^paradigm:" research/ --no-filename | sort | uniq -c
 rg "virtual dom" research/ -A 3 -B 3
 ```
 
+## Synthesis Documents
+
+On top of the per-framework reviews, the repo root holds a small set of synthesis documents that draw conclusions across the corpus:
+
+- **README.md** - Entry point pointing visitors to the right document for what they need.
+- **AGENTIC-DEV-RANKINGS.md** - Ranks the reviewed frameworks/libraries for agentic development. Designed to be re-run periodically (its own Methodology section explains how) so that v1, v2, v3, etc. stay comparable over time.
+- **NEXT-GEN-FRAMEWORK.md** - Design principles for an AI-first UI framework, synthesized from the reviews.
+- **LANGUAGE-DESIGN.md** - A companion language proposal (StrictTS) for pairing with the framework design.
+
+**Writing guidance for these (and any future periodically-updated synthesis doc):** because they get revisited and re-run every several months, avoid prose that's tied to the moment it was written:
+- No hardcoded counts that will drift ("24 frameworks," "18 entries") - reference the directory or describe the set instead.
+- No narration of in-the-moment decisions ("while building this list, it became clear...", "X now carries a tag") - state the resulting design as a standing fact.
+- No "as of this writing" / "right now" framing duplicated across sections - if a doc has a dedicated section for time-sensitive state (e.g., "Frameworks to Watch"), point to it from elsewhere rather than repeating the specifics in two places that can drift apart.
+- TODOs about *this pass's* data gaps (e.g., "these files still have null scores, run X to fix") belong in a scratch note or the methodology's "how to re-run" steps - not narrated inline as if they're permanent facts about the data.
+
 ## Review Template
 
 Each framework review should follow this structure. Use consistent headers for AI searchability. Not all sections apply to all frameworks - document what exists.
