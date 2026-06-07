@@ -1,6 +1,6 @@
 # The Best UI Frameworks for Agentic Development
 
-This is the synthesis this whole research project was building toward: given everything we've learned reviewing 24 frameworks/libraries and tracking how frontier LLMs have evolved, **which of these would you actually want an AI agent building your UI in today?**
+This is the synthesis this whole research project was building toward: given everything we've learned reviewing the frameworks and libraries in `/research` and tracking how frontier LLMs have evolved, **which of these would you actually want an AI agent building your UI in today?**
 
 > **Ranking version:** v1 — 2026-06-07
 > **Inputs:** The 24 reviews in `/research`, their frontmatter scores, and the 2026 frontier-LLM-capability findings synthesized in [NEXT-GEN-FRAMEWORK.md](./NEXT-GEN-FRAMEWORK.md).
@@ -16,14 +16,14 @@ The goal of writing this section first is so that **six months from now, someone
 
 Ranking Astro against Zustand is comparing a house to a doorknob — they solve different problems. So this doc produces **two ranked lists**:
 
-1. **Full/meta-frameworks & rendering libraries** — the "what do I build the UI in" decision (18 entries)
-2. **State-management libraries** — the "what do I reach for when the framework doesn't dictate this" decision (6 entries)
+1. **Full/meta-frameworks & rendering libraries** — the "what do I build the UI in" decision
+2. **State-management libraries** — the "what do I reach for when the framework doesn't dictate this" decision
 
 `vanilla-js` is included in list 1 as the baseline "no framework" option — useful as a floor to measure everything else against.
 
 ### A visible "what kind of thing is this" tag
 
-While building this list, it became clear that "Full Frameworks, Meta-Frameworks & Rendering Libraries" still spans tools that do meaningfully different *jobs* — Astro optimizes for content sites rather than applications, Svelte and React are rendering layers that typically pair with a meta-framework (SvelteKit, Next.js) to become a full app stack, htmx and Alpine.js augment a backend rather than replacing one, and so on. Rather than dropping any of them — their scores are still real data points — **every entry now carries a short `Type` tag** so the rank order can't be misread as "18 interchangeable options for the same job":
+"Full Frameworks, Meta-Frameworks & Rendering Libraries" still spans tools that do meaningfully different *jobs* — Astro optimizes for content sites rather than applications, Svelte and React are rendering layers that typically pair with a meta-framework (SvelteKit, Next.js) to become a full app stack, htmx and Alpine.js augment a backend rather than replacing one, and so on. Rather than dropping any of them — their scores are still real data points — **every entry carries a short `Type` tag** so the rank order can't be misread as "N interchangeable options for the same job":
 
 | Tag | Meaning |
 |---|---|
@@ -43,18 +43,18 @@ Each framework/library is scored 0–10 on five factors, then combined into a we
 
 | # | Factor | Weight | What it measures | Where the score comes from |
 |---|--------|--------|------------------|----------------------------|
-| 1 | **AI-Friendliness** | 30% | Overall explicitness, locality of behavior, predictability — the holistic quality the original reviews were built to capture | Pulled directly from `ai_friendliness_score` in frontmatter. **Re-run note:** seven files (`react`, `solid`, `svelte`, `vue`, `jotai`, `tanstack-query`, `vanilla-js`) had `null` in frontmatter; for those, this score is the average of the "Overall AI-Friendliness," "Overall Rendering AI-Friendliness," and "Overall Event Handling AI-Friendliness" lines found in the review body. **Fix opportunity:** run `npm run extract-scores` to close this gap before the next pass. |
+| 1 | **AI-Friendliness** | 30% | Overall explicitness, locality of behavior, predictability — the holistic quality the original reviews were built to capture | Pulled from `ai_friendliness_score` in frontmatter. Where that field is `null`, fall back to averaging the "Overall AI-Friendliness," "Overall Rendering AI-Friendliness," and "Overall Event Handling AI-Friendliness" lines in the review body — then run `npm run extract-scores` so the frontmatter is complete for the *next* pass. |
 | 2 | **Training-data familiarity** | 20% | How much of the model's pretraining priors it can lean on — older, more popular, more-discussed frameworks give the model more to work with before it ever reads your code | Estimated tier based on ecosystem size, age (`first_released`), maintainer profile, and general knowledge of how much public code/discussion exists. **This is the softest of the five factors** — there's no API for "tokens of training data per framework." Re-scoring this in 6 months means re-asking: *"would a model trained today have seen a lot of this, a little, or none?"* |
 | 3 | **Verifiability-loop quality** | 20% | How fast and unambiguous the compile→test→run feedback an agent gets is — this is the dimension the 2026 LLM-capability research surfaced as newly important, since agents now run code and self-correct rather than generating blind | Extracted from each review's "Developer Experience" / "DevTools" / "Debugging" subsections: native vs. community TypeScript support, compile-time error quality, test tooling, hot-reload speed |
 | 4 | **Token efficiency / boilerplate density** | 15% | How much code (and therefore how many generation + context tokens) a typical small feature costs — leaner code means fewer chances for an agent to introduce inconsistency across a file, and cheaper iteration loops | Extracted from representative code samples and explicit "Boilerplate: low/medium/high" callouts in each review; scored 0–10 where 10 = least boilerplate |
-| 5 | **Convention strength & stability** | 15% | How strongly the framework constrains *how* you build things (fewer valid approaches = smaller search space for an agent to reason over), penalized for being mid-rewrite right now | Base score from how opinionated the "Philosophy & Mental Model" section describes the framework as being, **minus a stability penalty** for frameworks currently shipping a breaking rewrite (see the 2026 framework-landscape section of NEXT-GEN-FRAMEWORK.md — Remix 3, Solid 2.0, Qwik 2.0, Vue Vapor Mode, htmx 4.0 all took a penalty here) |
+| 5 | **Convention strength & stability** | 15% | How strongly the framework constrains *how* you build things (fewer valid approaches = smaller search space for an agent to reason over), penalized when it's mid-rewrite at scoring time | Base score from how opinionated the "Philosophy & Mental Model" section describes the framework as being, **minus a stability penalty** applied to any framework currently shipping a breaking rewrite — see "Frameworks to Watch" below for which ones took it this round |
 
 **Composite score** = `0.30×AIF + 0.20×Familiarity + 0.20×Verifiability + 0.15×Efficiency + 0.15×Convention`
 
 ### Caveats — read before trusting any single number
 
 - **Factor 2 (training-data familiarity) is an estimate, not a measurement.** No one outside the model labs can audit pretraining corpora. Treat the tiering as "informed judgment," and feel free to substitute a better proxy if one becomes available (e.g., GitHub repo counts, Stack Overflow question volume, npm download trends).
-- **Several frameworks are mid-rewrite right now** (Remix 3, Solid 2.0, Qwik 2.0, Vue 3.6 Vapor Mode, htmx 4.0 — all in beta as of this writing). Their scores reflect *today's* stable release with a stability penalty applied; their position will likely shift — in either direction — once those land. Don't read their rank as a permanent verdict.
+- **A handful of frameworks are mid-rewrite at any given scoring pass** — see "Frameworks to Watch" below for this round's list. Their scores reflect the current stable release with a stability penalty applied; their position will likely shift — in either direction — once the rewrite lands. Don't read their rank as a permanent verdict.
 - **The weights are a judgment call**, not a derived constant. If you think token efficiency should matter more than training-data familiarity, change the weights and recompute — the per-factor scores in the tables below are there so you can do exactly that without redoing the extraction work.
 - **A high score here means "good raw material for an agent to work with," not "good for your project."** Team familiarity, hiring, ecosystem maturity for your specific domain, and a dozen other factors that have nothing to do with AI assistance still matter for real decisions.
 
@@ -103,7 +103,7 @@ Each framework/library is scored 0–10 on five factors, then combined into a we
 
 **4. Elm** posts the single highest verifiability score (10/10) and convention score (10/10) of anything reviewed — "if it compiles, it works" is *the* agentic-development dream, and Model-Update-View leaves no ambiguity about where anything lives. It's held back almost entirely by training-data familiarity: it's a 2012 language with a small, devoted community, which is exactly the gap [LANGUAGE-DESIGN.md](./LANGUAGE-DESIGN.md)'s StrictTS is trying to close — Elm's guarantees, TypeScript's training-data gravity.
 
-**5. Phoenix LiveView** is the highest-scoring *full-stack* framework on AI-friendliness (9.5 — still the top score in the entire 24-framework corpus) and backs it with genuinely excellent verifiability (the review highlights immediate compiler feedback and headless tests that don't need a browser). Its familiarity score is the tax for choosing Elixir — a fantastic language that most training corpora have seen comparatively little of.
+**5. Phoenix LiveView** is the highest-scoring *full-stack* framework on AI-friendliness (9.5 — still the top AI-friendliness score in the whole corpus) and backs it with genuinely excellent verifiability (the review highlights immediate compiler feedback and headless tests that don't need a browser). Its familiarity score is the tax for choosing Elixir — a fantastic language that most training corpora have seen comparatively little of.
 
 ### The shape of the list
 
