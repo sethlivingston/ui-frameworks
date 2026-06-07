@@ -56,16 +56,26 @@ files.forEach(file => {
   frontmatter.docs_url = indexEntry.docs_url;
   frontmatter.implementation_language = indexEntry.implementation_language;
   frontmatter.status = indexEntry.status;
-  frontmatter.ai_friendliness_score = indexEntry.ai_friendliness_score;
-  frontmatter.reusability_score = indexEntry.reusability_score;
-  frontmatter.maintainability_score = indexEntry.maintainability_score;
+  frontmatter.type_system_score = indexEntry.type_system_score;
+  frontmatter.compiler_feedback_score = indexEntry.compiler_feedback_score;
+  frontmatter.locality_score = indexEntry.locality_score;
+  frontmatter.explicitness_score = indexEntry.explicitness_score;
+  frontmatter.convention_strength_score = indexEntry.convention_strength_score;
+  frontmatter.token_efficiency_score = indexEntry.token_efficiency_score;
+  frontmatter.familiarity_score = indexEntry.familiarity_score;
+  frontmatter.stability_score = indexEntry.stability_score;
+  frontmatter.tooling_score = indexEntry.tooling_score;
 
   // OPTIONAL FIELDS (only include if not null)
   if (indexEntry.version) frontmatter.version = indexEntry.version;
   if (indexEntry.type) frontmatter.type = indexEntry.type;
 
   if (indexEntry.npm_package) frontmatter.npm_package = indexEntry.npm_package;
-  if (indexEntry.mcp_server) frontmatter.mcp_server = indexEntry.mcp_server;
+  if (indexEntry.ai_tooling) frontmatter.ai_tooling = indexEntry.ai_tooling;
+  if (indexEntry.next_release) frontmatter.next_release = indexEntry.next_release;
+  if (indexEntry.components) frontmatter.components = indexEntry.components;
+  if (indexEntry.supersedes) frontmatter.supersedes = indexEntry.supersedes;
+  if (indexEntry.superseded_by) frontmatter.superseded_by = indexEntry.superseded_by;
 
   if (indexEntry.typescript_support) {
     frontmatter.typescript_support = indexEntry.typescript_support;

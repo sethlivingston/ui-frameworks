@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "index": "node scripts/build-index.js",
-    "extract-scores": "node scripts/extract-scores.js",
     "normalize": "node scripts/normalize-frontmatter.js",
     "sync": "node scripts/sync-frontmatter.js"
   },

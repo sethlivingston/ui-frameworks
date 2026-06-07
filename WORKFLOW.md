@@ -5,9 +5,6 @@ This document describes the proper workflow for maintaining the UI frameworks re
 ## Quick Reference: Available Commands
 
 ```bash
-# Extract reusability & maintainability scores from markdown content into frontmatter
-npm run extract-scores
-
 # Normalize all frontmatter to match schema (fixes field names, categories, missing fields)
 npm run normalize
 
@@ -24,13 +21,7 @@ npm run index
 
 When you add a new framework review or update an existing one:
 
-1. **Extract scores** (if you added reusability/maintainability sections)
-   ```bash
-   npm run extract-scores
-   ```
-   This reads the "Quality: X/10" lines from the markdown and adds them to frontmatter.
-
-2. **Normalize frontmatter** (to ensure consistency with schema)
+1. **Normalize frontmatter** (to ensure consistency with schema)
    ```bash
    npm run normalize
    ```
@@ -40,7 +31,7 @@ When you add a new framework review or update an existing one:
    - Adds missing required fields
    - Reorders fields for readability
 
-3. **Build index and validate**
+2. **Build index and validate**
    ```bash
    npm run index
    ```
@@ -48,9 +39,9 @@ When you add a new framework review or update an existing one:
    - Generates `/research/frameworks.json` with all structured data
    - Validates all frontmatter against the schema
    - Reports any errors or warnings
-   - Shows statistics (paradigms, state models, score ranges)
+   - Shows statistics (paradigms, state models, rendering strategies)
 
-4. **Sync markdown files with index**
+3. **Sync markdown files with index**
    ```bash
    npm run sync
    ```
@@ -61,7 +52,7 @@ When you add a new framework review or update an existing one:
 If you want to do all steps at once:
 
 ```bash
-npm run extract-scores && npm run normalize && npm run index && npm run sync
+npm run normalize && npm run index && npm run sync
 ```
 
 Or in reverse order if you're confident your frontmatter is clean:
@@ -77,7 +68,6 @@ The relationship between markdown files and the index:
 ```
 Markdown files (source)
     ↓
-    ├─ Extract scores from content → update frontmatter
     ├─ Normalize to schema
     └─ Sync with index
     ↓
@@ -100,13 +90,27 @@ All frontmatter must conform to `/schema/framework-review.schema.json`:
 - `docs_url` - Official documentation URL
 - `implementation_language` - Programming language
 - `status` - active, maintenance, deprecated, archived
-- `ai_friendliness_score` - Number 0-10
-- `reusability_score` - Number 0-10
-- `maintainability_score` - Number 0-10
+- `type_system_score` - Number 0-10 or null (Type-system integration)
+- `compiler_feedback_score` - Number 0-10 or null (Compiler/build feedback quality)
+- `locality_score` - Number 0-10 or null (Locality of behavior)
+- `explicitness_score` - Number 0-10 or null (Explicitness / data-flow traceability)
+- `convention_strength_score` - Number 0-10 or null (Convention strength)
+- `token_efficiency_score` - Number 0-10 or null (Token efficiency / boilerplate density)
+- `familiarity_score` - Number 0-10 or null (Familiarity composite)
+- `stability_score` - Number 0-10 or null (Stability / convention durability)
+- `tooling_score` - Number 0-10 or null (Ecosystem tooling facts)
+
+`null` is permitted on the score fields so a freshly-scaffolded review can validate
+before evidence-gathering completes — each non-null score should be backed by a
+matching `### Evidence: <Dimension Name>` section in the body.
 
 **Recommended fields:**
 - `version` - Current reviewed version
 - `npm_package` - NPM package name
+- `components` - Array of technology identifiers, present only on combo files (e.g. `["lit", "preact"]`)
+- `next_release` - Tracked next-release info: `{ name, status, changes, anticipated_impact, stability_penalty }`
+- `ai_tooling` - Tracked AI-tooling investment: `{ mcp_server, guidelines, llms_txt, style_guides, observed_delta }`
+- `supersedes` / `superseded_by` - Framework name or filename references linking rewrite-detection chains
 - `typescript_support` - native, types-package, community-types, none
 - `license` - MIT, Apache-2.0, etc.
 - `runtime` - browser, node, both, deno, bun, server
@@ -123,21 +127,13 @@ See `/schema/README.md` for complete documentation.
 
 ## Editing Workflow
 
-### Option A: Edit Markdown Content, Keep Frontmatter Clean
+Research agents write the 9 rubric scores straight to frontmatter (no body→frontmatter
+extraction step exists or is needed) — the body's `### Evidence: <Dimension Name>`
+sections hold the supporting artifact, linked to the score by naming convention.
 
-1. Edit the markdown content (state mgmt, rendering, event handling sections)
-2. If you updated reusability/maintainability scores, add them to content:
-   ```markdown
-   ### Component Reusability Assessment
-
-   **Quality: Excellent (9/10)**
-   ```
-3. Run extract-scores to move them to frontmatter
-4. Run normalize, index, and sync
-
-### Option B: Edit Frontmatter Directly
-
-1. Edit the YAML frontmatter in the markdown file
+1. Edit the markdown content (state mgmt, rendering, event handling sections, and
+   the `## Rubric Evidence` / `## On the Horizon` sections, including frontmatter
+   scores)
 2. Run `npm run normalize` to fix any issues
 3. Run `npm run index && npm run sync` to update index
 
@@ -183,8 +179,8 @@ This enables:
 Good workflow before committing:
 
 1. Make changes to framework reviews
-2. Run: `npm run extract-scores && npm run normalize && npm run sync && npm run index`
-3. Verify validation report shows ✅ Valid: 24 and no errors
+2. Run: `npm run normalize && npm run sync && npm run index`
+3. Verify validation report shows all files valid with no errors
 4. Review changes with `git diff`
 5. Commit
 

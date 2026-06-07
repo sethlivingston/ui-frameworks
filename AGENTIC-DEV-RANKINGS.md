@@ -37,34 +37,90 @@ Ranking Astro against Zustand is comparing a house to a doorknob — they solve 
 
 (List 2's libraries get a lighter version of the same idea — a one-word tag naming the state-management *style*, since they're already a fairly homogeneous category.)
 
-### The five factors
+### The nine dimensions, and the one transparent total
 
-Each framework/library is scored 0–10 on five factors, then combined into a weighted composite. The weights reflect a judgment call: **AI-friendliness matters most because it's the most holistic existing measure** (it already encodes explicitness, locality, and predictability from the original reviews); the other four factors are new lenses specific to *agentic* development that the original reviews didn't explicitly score for.
+Each framework/library in `/research` is scored 0–10 on **9 flat dimensions**,
+written directly to frontmatter by the research agent (`.claude/agents/
+framework-researcher.md`) with a matching `### Evidence: <Dimension Name>` artifact
+in the review body — no holistic "AI-Friendliness" stand-in, no per-section scoring
+to reconcile. This is the corpus's single source of truth for scoring; this doc
+doesn't re-derive or re-score anything, it only ranks from what's already evidenced.
 
-| # | Factor | Weight | What it measures | Where the score comes from |
-|---|--------|--------|------------------|----------------------------|
-| 1 | **AI-Friendliness** | 30% | Overall explicitness, locality of behavior, predictability — the holistic quality the original reviews were built to capture | Pulled from `ai_friendliness_score` in frontmatter. Where that field is `null`, fall back to averaging the "Overall AI-Friendliness," "Overall Rendering AI-Friendliness," and "Overall Event Handling AI-Friendliness" lines in the review body — then run `npm run extract-scores` so the frontmatter is complete for the *next* pass. |
-| 2 | **Training-data familiarity** | 20% | How much of the model's pretraining priors it can lean on — older, more popular, more-discussed frameworks give the model more to work with before it ever reads your code | Estimated tier based on ecosystem size, age (`first_released`), maintainer profile, and general knowledge of how much public code/discussion exists. **This is the softest of the five factors** — there's no API for "tokens of training data per framework." Re-scoring this in 6 months means re-asking: *"would a model trained today have seen a lot of this, a little, or none?"* |
-| 3 | **Verifiability-loop quality** | 20% | How fast and unambiguous the compile→test→run feedback an agent gets is — this is the dimension the 2026 LLM-capability research surfaced as newly important, since agents now run code and self-correct rather than generating blind | Extracted from each review's "Developer Experience" / "DevTools" / "Debugging" subsections: native vs. community TypeScript support, compile-time error quality, test tooling, hot-reload speed |
-| 4 | **Token efficiency / boilerplate density** | 15% | How much code (and therefore how many generation + context tokens) a typical small feature costs — leaner code means fewer chances for an agent to introduce inconsistency across a file, and cheaper iteration loops | Extracted from representative code samples and explicit "Boilerplate: low/medium/high" callouts in each review; scored 0–10 where 10 = least boilerplate |
-| 5 | **Convention strength & stability** | 15% | How strongly the framework constrains *how* you build things (fewer valid approaches = smaller search space for an agent to reason over), penalized when it's mid-rewrite at scoring time | Base score from how opinionated the "Philosophy & Mental Model" section describes the framework as being, **minus a stability penalty** applied to any framework currently shipping a breaking rewrite — see "Frameworks to Watch" below for which ones took it this round |
+| Weight | Dimension | Frontmatter field | What it measures |
+|---|---|---|---|
+| 15% | Type-system integration | `type_system_score` | How much the compiler/type-checker catches before runtime |
+| 15% | Compiler/build feedback quality | `compiler_feedback_score` | How useful the error you get back actually is |
+| 13% | Locality of behavior | `locality_score` | How many files/concepts you must touch to understand or change one feature |
+| 13% | Explicitness / data-flow traceability | `explicitness_score` | How many "magic" steps sit between a trigger and what renders |
+| 11% | Convention strength | `convention_strength_score` | How many valid ways exist to do the same common task |
+| 10% | Token efficiency / boilerplate density | `token_efficiency_score` | How much code a small feature costs |
+| 11% | Familiarity composite | `familiarity_score` | How much of this a model's pretraining likely covers (the one deliberate composite — triangulated from age-weighted community volume, GitHub activity, registry trend, and `first_released`, since pretraining exposure itself is unmeasurable) |
+| 7% | Stability / convention durability | `stability_score` | Whether "how it's done today" will still be true in 6 months — sourced from the framework's `next_release` tracking |
+| 5% | Ecosystem tooling facts | `tooling_score` | What verification-side infrastructure exists (devtools, test utilities, IDE/LSP support) |
 
-**Composite score** = `0.30×AIF + 0.20×Familiarity + 0.20×Verifiability + 0.15×Efficiency + 0.15×Convention`
+**Why these weights, and why familiarity is the only composite**: see
+`CLAUDE.md`'s Review Template (`## Rubric Evidence`) for the full per-dimension
+evidence requirements, and `.claude/agents/framework-researcher.md` for the research
+brief that operationalizes them — this doc shouldn't duplicate that reasoning, only
+consume its output.
+
+**The ranking below shows two things, deliberately, side by side:**
+
+1. **All 9 raw scores per framework** — so you can re-derive *any* weighting you
+   personally care about (token efficiency matters more to you than familiarity?
+   recompute with your own numbers — the inputs are right there) without redoing any
+   extraction work.
+2. **One headline weighted total**, computed transparently as
+   `Σ(weight × dimension score)` using the **same per-dimension weights already
+   published in the rubric above** — not a freshly-invented vocabulary layered on
+   top. This is arithmetic on numbers that are already public and already evidenced,
+   not a new judgment-call-disguised-as-data translation layer (which is exactly what
+   made the old "AI-Friendliness/Familiarity/Verifiability/Efficiency/Convention"
+   composite a problem — those factors didn't correspond to anything in frontmatter
+   and had to be re-derived from prose by hand each pass). If you disagree with the
+   rubric's weights, the flat table is right there for you to recompute your own.
 
 ### Caveats — read before trusting any single number
 
-- **Factor 2 (training-data familiarity) is an estimate, not a measurement.** No one outside the model labs can audit pretraining corpora. Treat the tiering as "informed judgment," and feel free to substitute a better proxy if one becomes available (e.g., GitHub repo counts, Stack Overflow question volume, npm download trends).
-- **A handful of frameworks are mid-rewrite at any given scoring pass** — see "Frameworks to Watch" below for this round's list. Their scores reflect the current stable release with a stability penalty applied; their position will likely shift — in either direction — once the rewrite lands. Don't read their rank as a permanent verdict.
-- **The weights are a judgment call**, not a derived constant. If you think token efficiency should matter more than training-data familiarity, change the weights and recompute — the per-factor scores in the tables below are there so you can do exactly that without redoing the extraction work.
-- **A high score here means "good raw material for an agent to work with," not "good for your project."** Team familiarity, hiring, ecosystem maturity for your specific domain, and a dozen other factors that have nothing to do with AI assistance still matter for real decisions.
+- **The rubric's weights are a judgment call**, settled once (see `CLAUDE.md` /
+  the research brief) and reused consistently here rather than re-derived per
+  ranking pass — that consistency is what makes the headline total comparable across
+  re-runs. If the weights themselves change, that's a rubric-level decision (update
+  `CLAUDE.md` and the agent brief), not a per-ranking-pass tweak.
+- **Familiarity is the one deliberate composite** — its target (how much of a
+  framework's usage patterns a model's pretraining covers) is fundamentally
+  unmeasurable, so triangulating four imperfect proxies (age-weighted community
+  volume, GitHub activity, registry trend direction, `first_released`) is the
+  *correct* move here, not a shortcut. See that dimension's `### Evidence:` sections
+  in the reviews for how each framework's triangulation was done — including the
+  documented exception for CDN/script-tag-distributed tools (htmx, Alpine.js) whose
+  registry numbers structurally undercount real usage.
+- **`stability_score` reflects a snapshot** — frameworks actively shipping a
+  breaking rewrite take a stability penalty sourced from their `next_release`
+  frontmatter (see "Frameworks to Watch" below); expect their position to shift,
+  in either direction, once the rewrite lands. Don't read their rank as a permanent
+  verdict.
+- **A high score here means "good raw material for an agent to work with," not "good
+  for your project."** Team familiarity, hiring, ecosystem maturity for your specific
+  domain, and a dozen other factors that have nothing to do with AI assistance still
+  matter for real decisions.
 
 ### How to re-run this in six months
 
-1. Re-run `npm run extract-scores && npm run normalize && npm run sync && npm run index` so frontmatter `ai_friendliness_score` is complete (closes the gap noted in Factor 1).
-2. Re-spot-check the frameworks that were flagged as "mid-rewrite" — have Remix 3 / Solid 2.0 / Qwik 2.0 / Vue Vapor / htmx 4.0 gone stable? Re-score factors 4 and 5 against the new stable release, and lift the stability penalty.
-3. Re-derive Factor 2 (familiarity) — has anything's popularity meaningfully shifted? New frameworks worth adding to the corpus entirely?
-4. Re-derive Factor 3 (verifiability) — this is the factor most likely to be reshaped by *model* improvements rather than *framework* improvements (e.g., if agentic tooling gets good enough at running any framework's dev server and reading its errors, the gap between "good DX" and "great DX" frameworks may compress).
-5. Recompute the composite, re-rank, and **diff v1 vs. v2** — the motion is the interesting part.
+1. Run `npm run normalize && npm run index && npm run sync` to confirm the corpus's
+   frontmatter is current and validates clean against `schema/framework-review.schema.json`.
+2. For each framework, check whether its review has been refreshed since the last
+   ranking pass (`reviewed_date` / `git log` on the file) — if not, that's a signal to
+   queue it for the verification-first follow-on pass the research brief describes
+   (`.claude/agents/framework-researcher.md`), not to re-rank stale scores.
+3. Re-generate "Frameworks to Watch" by querying tracked `next_release` data —
+   `rg "next_release:" research/ -A 5` surfaces every framework currently tracking an
+   upcoming change; pull the ones with `status` of `alpha`/`beta`/`rfc` or
+   `stability_penalty: true`.
+4. Recompute the headline weighted total from the (now-current) 9 flat scores, re-rank,
+   and **diff v1 vs. v2** — the motion is the interesting part. A framework whose
+   flat scores barely moved but whose rank shifted tells you the *competition* changed;
+   one whose scores moved but rank didn't tells you the opposite.
 
 ---
 
@@ -139,13 +195,25 @@ Notice what clusters at the top: **compiler-driven or convention-heavy framework
 
 ## Frameworks to Watch (don't trust today's rank for these)
 
-These five are mid-rewrite as of this ranking — the version reviewed and scored is the *current stable* release, with a stability penalty applied to Factor 5. Revisit them specifically once their next major version stabilizes:
+This section is a **generated rollup** of the corpus's tracked `next_release`
+frontmatter — the per-framework "On the Horizon" data each review maintains as its
+single source of truth for "this is mid-rewrite" (see `## On the Horizon` in
+`CLAUDE.md`'s Review Template). Regenerate it with:
 
-- **Remix 3** (beta) — drops React entirely for its own web-standards component model. This isn't an iteration, it's a different framework wearing a familiar name; expect familiarity and convention scores to reset closer to zero on launch, then rebuild.
-- **Solid 2.0** (beta) — reworked async model (`createMemo` gets first-class Promises, redesigned Suspense). Could meaningfully change the verifiability and token-efficiency story for async-heavy UIs.
-- **Qwik 2.0** (beta) — near-rewrite with new package scope and primitives. Resumability — Qwik's whole reason for existing — extends into new territory (`worker$`, `useAsyncComputed$`).
-- **Vue 3.6 "Vapor Mode"** (beta) — compiles away the virtual DOM entirely. If it ships, Vue's `rendering_strategy` classification itself changes, which could shift its verifiability and efficiency scores upward.
-- **htmx 4.0** (beta) — makes attribute inheritance *explicit* via `:inherited` (previously implicit). This is a rare case where a beta change should *improve* a framework's AI-friendliness score on arrival — it's removing exactly the kind of implicit behavior this whole research project flags as friction.
+```bash
+rg "next_release:" research/ -A 6
+```
+
+...and pull every entry whose `status` is `alpha`, `beta`, `rfc`, or `announced`, or
+whose `stability_penalty` is `true`. Their `stability_score` already reflects the
+penalty (see that dimension's `### Evidence:` section in each review for the citation
+and reasoning) — their position will likely shift, in either direction, once the
+named release actually ships and stabilizes. Don't read their current rank as a
+permanent verdict; revisit them specifically once their tracked release lands.
+
+*(This list is regenerated each ranking pass from the query above — it intentionally
+carries no hand-maintained prose of its own, so it can't drift out of sync with the
+per-framework tracking the way a hand-written list would.)*
 
 ---
 

@@ -5,9 +5,15 @@ github_url: "https://github.com/lit/lit"
 docs_url: "https://lit.dev"
 implementation_language: "TypeScript"
 status: "active"
-ai_friendliness_score: 7.5
-reusability_score: 9.5
-maintainability_score: 9
+type_system_score: null
+compiler_feedback_score: null
+locality_score: null
+explicitness_score: null
+convention_strength_score: null
+token_efficiency_score: null
+familiarity_score: null
+stability_score: null
+tooling_score: null
 capabilities:
   state_management: false
   rendering: false
