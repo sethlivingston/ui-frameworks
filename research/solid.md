@@ -28,6 +28,8 @@ reviewed_by_model: "Claude Sonnet 4.5"
 
 # Solid
 
+> **2026 update note (2026-06-07):** Solid 2.0 (beta, May 2026) reworks the async model significantly — first-class Promises inside `createMemo`, a redesigned Suspense/loading story, `createEffect` split into separate compute/apply phases, and `<For keyed={false}>` replacing `<Index>`. The "Async Handling" section below describes the 1.x model; revisit once 2.0 stabilizes.
+
 ## State Management
 
 ### Philosophy & Mental Model

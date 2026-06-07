@@ -16,6 +16,8 @@ capabilities:
 
 # Angular
 
+> **2026 update note (2026-06-07):** Angular 22 (May 2026) graduates **Signal Forms**, **Selectorless Components**, and **Zoneless** change detection from experimental to stable/production-ready. This is a meaningful shift from the Zone.js/decorator/RxJS model described below — Angular's `state_model` is now genuinely signals-first rather than Observable-and-Zone-based. The review below still describes the framework accurately as a system, but the "Signals (New)" and "Change Detection" notes should be read as: this is no longer new, it's the default.
+
 ## Philosophy & Mental Model
 
 Angular is **"The framework for building scalable web apps with confidence"**—an opinionated, batteries-included platform for enterprise applications. Unlike React's minimal library approach or Vue's progressive framework philosophy, Angular provides **everything you need out of the box**: routing, forms, HTTP client, animations, testing utilities, and build tooling.

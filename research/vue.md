@@ -28,6 +28,8 @@ reviewed_by_model: "Claude Sonnet 4.5"
 
 # Vue
 
+> **2026 update note (2026-06-07):** Vue 3.6 Vapor Mode (beta as of early 2026) compiles away the virtual DOM entirely, targeting Svelte/Solid-level performance via compile-time rendering. If/when it stabilizes, `rendering_strategy` for Vue arguably shifts from `virtual-dom` toward `compiler`/`fine-grained` — worth a fresh look once Vapor Mode reaches stable (tracking for Q3-Q4 2026 per the beta roadmap).
+
 ## State Management
 
 ### Philosophy & Mental Model

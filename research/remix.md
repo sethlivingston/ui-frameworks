@@ -16,6 +16,8 @@ capabilities:
 
 # Remix
 
+> **2026 update note (2026-06-07):** Remix 3 (beta preview, April 2026) is a ground-up rewrite that **drops React entirely** — it ships its own component model on web standards (Fetch API runtime, no virtual DOM; JSX syntax remains but compiles differently), with no migration path from Remix 2. If it ships stable, this review (written against Remix-on-React) describes a different framework than what "Remix" will mean going forward — treat the analysis below as covering "Remix 2 / classic Remix" and plan a fresh review once Remix 3 stabilizes.
+
 ## Philosophy & Mental Model
 
 Remix is **"a full-stack web framework that focuses on web fundamentals and modern UX."** Created by the React Router team, Remix is now merged into React Router v7 as its full-stack evolution.

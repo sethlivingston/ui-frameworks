@@ -16,6 +16,8 @@ capabilities:
 
 # Astro
 
+> **2026 update note (2026-06-07):** Astro 6.0 (March 2026) shipped an experimental Rust compiler (replacing the Go-based one), a rewrite of the dev/build pipeline on Vite's Environment API, a built-in Fonts API, a CSP API, and Live Content Collections. It also raised the minimum to Node 22+. The Islands Architecture and "zero JS by default" philosophy described below are unchanged — this is a tooling/performance overhaul underneath the same mental model, not a paradigm shift.
+
 ## Philosophy & Mental Model
 
 Astro is **"a server-first, content-driven web framework"** that pioneered **Islands Architecture**—rendering pages as static HTML with JavaScript only where interactivity is needed.

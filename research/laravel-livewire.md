@@ -16,6 +16,8 @@ capabilities:
 
 # Laravel Livewire
 
+> **2026 update note (2026-06-07):** Livewire v4 shipped January 2026 with parallel live updates (faster reactivity), a `wire:transition` directive for animations, view-based components that keep PHP and Blade co-located, and an "Islands" feature for isolating reactive regions within a page. The "stay in PHP" philosophy and AJAX-by-default model described below remain the core identity — v4 sharpens the explicitness story (Islands narrows *what* re-renders, similar in spirit to Phoenix LiveView's explicit data flow) rather than replacing it.
+
 ## Philosophy & Mental Model
 
 Laravel Livewire is a **full-stack framework for Laravel that takes the pain out of building dynamic UIs**. Like Phoenix LiveView, it represents the server-rendered approach to interactivity: keep state and logic on the server, communicate changes via AJAX/WebSocket, and update only what changed in the DOM.

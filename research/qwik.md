@@ -16,6 +16,8 @@ capabilities:
 
 # Qwik
 
+> **2026 update note (2026-06-07):** Qwik 2.0 (beta) is close to a rewrite — packages move from `@builder.io/qwik` to `@qwik.dev/*`, serialized output drops comment-node markers, and new primitives (`useAsyncComputed$`, `worker$`) extend the resumability model into async state and Web Workers. The core "resumability instead of hydration" philosophy below is unchanged, but component-model and serialization details will likely need a refresh once 2.0 ships stable.
+
 ## Philosophy & Mental Model
 
 Qwik is **"a framework reimagined for the edge"** that eliminates traditional hydration through **resumability**—the ability to pause execution on the server and resume it on the client without re-running application logic.

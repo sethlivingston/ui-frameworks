@@ -16,6 +16,8 @@ capabilities:
 
 # htmx
 
+> **2026 update note (2026-06-07):** htmx 4.0 (beta, targeting summer 2026) replaces `XMLHttpRequest` with `fetch()` as its core AJAX layer, makes attribute inheritance **explicit** via an `:inherited` modifier (previously implicit), and changes back-button handling from DOM snapshotting to network requests. The `:inherited` change in particular *strengthens* the explicitness story this review praises — inheritance becomes something you can grep for rather than infer.
+
 ## Philosophy & Mental Model
 
 htmx represents a **radical departure from modern frontend development**. Instead of building complex client-side applications with JavaScript frameworks, htmx asks: **"What if we just extended HTML?"**
