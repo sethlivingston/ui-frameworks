@@ -45,6 +45,7 @@ files.forEach(file => {
   }
 
   const body = frontmatterMatch[2];
+  const existingFrontmatter = yaml.load(frontmatterMatch[1]) || {};
 
   // Build frontmatter from index entry, preserving order
   const frontmatter = {};
@@ -73,9 +74,14 @@ files.forEach(file => {
   if (indexEntry.npm_package) frontmatter.npm_package = indexEntry.npm_package;
   if (indexEntry.ai_tooling) frontmatter.ai_tooling = indexEntry.ai_tooling;
   if (indexEntry.next_release) frontmatter.next_release = indexEntry.next_release;
-  if (indexEntry.components) frontmatter.components = indexEntry.components;
-  if (indexEntry.supersedes) frontmatter.supersedes = indexEntry.supersedes;
-  if (indexEntry.superseded_by) frontmatter.superseded_by = indexEntry.superseded_by;
+
+  // Combo files & rewrite-detection links — preserved verbatim (including
+  // explicit null) whenever the file's own on-disk frontmatter declared them,
+  // since CLAUDE.md asks for these to be "set or explicitly null" on the files
+  // that use them, not silently introduced corpus-wide by the index round-trip.
+  if ('components' in existingFrontmatter) frontmatter.components = indexEntry.components;
+  if ('supersedes' in existingFrontmatter) frontmatter.supersedes = indexEntry.supersedes;
+  if ('superseded_by' in existingFrontmatter) frontmatter.superseded_by = indexEntry.superseded_by;
 
   if (indexEntry.typescript_support) {
     frontmatter.typescript_support = indexEntry.typescript_support;
@@ -101,6 +107,9 @@ files.forEach(file => {
   }
   if (indexEntry.reviewed_by_model) {
     frontmatter.reviewed_by_model = indexEntry.reviewed_by_model;
+  }
+  if ('reviewer_notes' in existingFrontmatter) {
+    frontmatter.reviewer_notes = indexEntry.reviewer_notes;
   }
 
   // Convert to YAML

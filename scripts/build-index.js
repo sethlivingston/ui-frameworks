@@ -114,6 +114,7 @@ files.forEach(file => {
       file: file.replace('.md', ''),
       name: frontmatter.name || frontmatter.framework,
       version: frontmatter.version || null,
+      type: frontmatter.type || null,
       category: frontmatter.category || null,
 
       // Links
@@ -160,9 +161,15 @@ files.forEach(file => {
       next_release: frontmatter.next_release || null,
       ai_tooling: frontmatter.ai_tooling || null,
 
+      // Combo files & rewrite-detection links
+      components: frontmatter.components || null,
+      supersedes: frontmatter.supersedes || null,
+      superseded_by: frontmatter.superseded_by || null,
+
       // Metadata
       reviewed_date: frontmatter.reviewed_date || null,
-      reviewed_by_model: frontmatter.reviewed_by_model || null
+      reviewed_by_model: frontmatter.reviewed_by_model || null,
+      reviewer_notes: frontmatter.reviewer_notes || null
     };
 
     frameworks.push(entry);
