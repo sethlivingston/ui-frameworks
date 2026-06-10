@@ -5,17 +5,35 @@ github_url: "https://github.com/pmndrs/jotai"
 docs_url: "https://jotai.org"
 implementation_language: "TypeScript"
 status: "active"
-type_system_score: null
-compiler_feedback_score: null
-locality_score: null
-explicitness_score: null
-convention_strength_score: null
-token_efficiency_score: null
-familiarity_score: null
-stability_score: null
-tooling_score: null
-version: "2.15.2"
+type_system_score: 8.5
+compiler_feedback_score: 7.5
+locality_score: 8.5
+explicitness_score: 8
+convention_strength_score: 7
+token_efficiency_score: 8.5
+familiarity_score: 7.5
+stability_score: 7.5
+tooling_score: 7.5
+version: "2.20.0"
 npm_package: "jotai"
+ai_tooling:
+  mcp_server:
+    available: true
+    url: "https://playbooks.com/mcp/jotaijs-documentation"
+    party: "third-party"
+  guidelines: null
+  llms_txt: false
+  style_guides: null
+  observed_delta: "The third-party MCP server (Ian Nuttall / Playbooks) exposes Jotai atom data over MCP for compatible clients (Claude Desktop, Cursor). Running the canonical todo exercise without the MCP server: AI produced working code using `useAtom` on a plain `atom<Todo[]>([])` — correct idiom. With the MCP server available: no change in code quality was observed for this exercise because the Jotai atom API is small enough (atom, useAtom, useAtomValue, useSetAtom) that training data already covers all common patterns. The MCP server's value appears limited to runtime atom introspection rather than improving code generation quality for a reviewer's workflow."
+next_release:
+  name: "v3"
+  status: "rfc"
+  changes: "Drop React < 18, drop UMD/SystemJS builds, move jotai/babel to jotai-babel package, remove loadable util (favor unwrap), remove setSelf from atom read functions, move atomFamily to jotai-family, rename/remove delay option in useAtomValue. Migration path for each removal is being deprecated-and-warned during v2."
+  anticipated_impact: "No core atom/useAtom API breakage. Consumers using jotai/babel, atomFamily from jotai/utils, loadable, or setSelf will need mechanical import updates. The atom primitive and useAtom/useAtomValue/useSetAtom hooks are unchanged."
+  stability_penalty: false
+components: null
+supersedes: null
+superseded_by: null
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
@@ -27,8 +45,9 @@ paradigm: "reactive"
 state_model: "atoms"
 maintainer: "Poimandres"
 first_released: "2020"
-reviewed_date: "2025-12-06"
-reviewed_by_model: "Claude Sonnet 4.5"
+reviewed_date: "2026-06-09"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Full rewrite under the 9-dimension agentic-dev rubric. Previous file had null scores and the pre-rubric per-capability-area structure. Version verified via `npm view jotai version` → 2.20.0. Reviewed as used in its primary context: React + TypeScript. Jotai is a state-only library; rendering and event-handling dimensions are not applicable and capabilities flags are set accordingly."
 ---
 
 # Jotai
@@ -37,452 +56,388 @@ reviewed_by_model: "Claude Sonnet 4.5"
 
 ### Philosophy & Mental Model
 
-Jotai adopts an **atomic approach** to global React state management with the core philosophy: "Build state by combining atoms and renders are automatically optimized based on atom dependency."
+Jotai takes an **atomic** approach to global React state: state is composed of independent atomic units (`atom`) rather than a monolithic store. The design tagline is "primitive and flexible state management for React."
 
-Key mental model concepts:
-- **Atoms as building blocks**: State is composed of independent atomic units rather than a monolithic store
-- **Bottom-up composition**: Complex state emerges from combining simple atoms, not top-down structure
-- **Automatic optimization**: The library handles re-render optimization automatically based on which atoms a component subscribes to
-- **No string keys**: Unlike Recoil, atoms don't require string identifiers - they use referential identity
-- **Scales from simple to complex**: Can replace `useState` for simple cases or handle enterprise TypeScript apps
-
-This approach eliminates the unnecessary re-renders common with React Context while maintaining React's declarative programming model.
+Core principles:
+- Every piece of state is an explicit `atom` object with a referential identity — no string keys, no slices, no shape declarations
+- Components subscribe at atom granularity; only components reading a changed atom re-render
+- Derived state is expressed as derived atoms (`atom(get => ...)`) — pure functions with automatic dependency tracking, no manual `useMemo` or dependency arrays
+- The API mirrors `useState`: `useAtom(myAtom)` returns `[value, setter]`
+- Providers are optional (there is a global default store); `<Provider>` is only needed to create isolated state scopes
 
 ### Core Primitives
 
-**Atoms** are the fundamental and only primitive. Created with the `atom()` function:
+One primitive: **`atom`**. Four forms:
 
-**Primitive atoms** - store any value type:
-```javascript
-const countAtom = atom(0)
-const countryAtom = atom('Japan')
-const citiesAtom = atom(['Tokyo', 'Kyoto', 'Osaka'])
-const userAtom = atom({ name: 'John', age: 30 })
-```
+```typescript
+// Primitive atom — holds a value
+const countAtom = atom(0)                          // Atom<number>
+const userAtom  = atom<User | null>(null)          // explicit type
 
-**Derived (read-only) atoms** - compute values from other atoms:
-```javascript
-const progressAtom = atom((get) => {
-  const anime = get(animeAtom)
-  return anime.filter((item) => item.watched).length / anime.length
-})
+// Read-only derived atom — computes from other atoms
+const doubleAtom = atom((get) => get(countAtom) * 2)
 
-const fullNameAtom = atom((get) => {
-  const firstName = get(firstNameAtom)
-  const lastName = get(lastNameAtom)
-  return `${firstName} ${lastName}`
-})
-```
-
-**Read-write atoms** - custom read and write logic:
-```javascript
-const readWriteAtom = atom(
-  (get) => get(primitiveAtom), // read
-  (get, set, newValue) => {     // write
-    set(primitiveAtom, newValue)
-  }
+// Read-write atom — custom read and write logic
+const cappedAtom = atom(
+  (get) => Math.min(get(countAtom), 100),
+  (get, set, newValue: number) => set(countAtom, Math.min(newValue, 100))
 )
+
+// Write-only atom — for commands/actions
+const resetAtom = atom(null, (_get, set) => set(countAtom, 0))
 ```
 
-**Write-only atoms** - for actions/commands:
-```javascript
-const incrementAtom = atom(
-  null, // no read
-  (get, set) => {
-    set(countAtom, get(countAtom) + 1)
-  }
-)
-```
-
-Each atom is an independent unit. Atoms don't need string keys - they use JavaScript referential identity.
+Secondary surface: `createStore()`, `<Provider store={...}>`, `useStore()` — for scoped or server-rendered contexts.
 
 ### Update Mechanism
 
-State changes through **setter functions** obtained from hooks:
-
-**Direct updates** via `useAtom` or `useSetAtom`:
-```javascript
-function Counter() {
-  const [count, setCount] = useAtom(countAtom)
-
-  return (
-    <button onClick={() => setCount(count + 1)}>
-      Count: {count}
-    </button>
-  )
-}
-```
-
-**Functional updates** (like React useState):
-```javascript
+```typescript
+// Via useAtom — read + write
 const [count, setCount] = useAtom(countAtom)
-setCount(prev => prev + 1)
+setCount(count + 1)
+setCount((prev) => prev + 1)   // functional update
+
+// Via useSetAtom — write-only, component never re-renders
+const increment = useSetAtom(incrementAtom)
+<button onClick={increment}>+</button>
+
+// Store API — outside React
+const store = createStore()
+store.set(countAtom, 42)
 ```
-
-**Write-only atoms** for actions:
-```javascript
-function Controls() {
-  const increment = useSetAtom(incrementAtom)
-  return <button onClick={increment}>Increment</button>
-}
-```
-
-**Batch updates**: React 18's automatic batching applies to Jotai updates.
-
-The update pattern is simple and direct - no actions, reducers, or dispatch functions required.
 
 ### Read Pattern
 
-Three hooks provide granular control over reads and writes:
-
-**`useAtom(atom)`** - Read and write (like `useState`):
-```javascript
+```typescript
+// Read + write
 const [value, setValue] = useAtom(myAtom)
-```
 
-**`useAtomValue(atom)`** - Read-only, optimized to prevent unnecessary re-renders:
-```javascript
+// Read-only — component subscribes but can't write
 const value = useAtomValue(myAtom)
-// Component only re-renders when myAtom changes
-```
 
-**`useSetAtom(atom)`** - Write-only, component never re-renders:
-```javascript
+// Write-only — component can write but never re-renders on change
 const setValue = useSetAtom(myAtom)
-// Component doesn't re-render when myAtom changes
 ```
-
-This separation enables precise re-render optimization. Components only update when their specific atoms change, and only if they're reading the value.
-
-**Store API** - Access atoms outside React components:
-```javascript
-import { createStore } from 'jotai'
-
-const store = createStore()
-const count = store.get(countAtom)
-store.set(countAtom, 5)
-```
-
-### Reactivity & Granularity
-
-**Atom-level granularity** - the most fine-grained reactivity model:
-
-- Only components that `useAtom` or `useAtomValue` a specific atom re-render when that atom changes
-- Components using `useSetAtom` never re-render when the atom changes
-- No selector equality checks needed (unlike Redux) - automatic dependency tracking
-- No manual memoization required - derived atoms automatically recompute only when dependencies change
-
-**Example of granular updates**:
-```javascript
-// Only re-renders when firstNameAtom changes, NOT when lastNameAtom changes
-function FirstNameDisplay() {
-  const firstName = useAtomValue(firstNameAtom)
-  return <div>{firstName}</div>
-}
-
-// Only re-renders when lastNameAtom changes
-function LastNameDisplay() {
-  const lastName = useAtomValue(lastNameAtom)
-  return <div>{lastName}</div>
-}
-
-// Re-renders when EITHER atom changes (automatic dependency detection)
-function FullNameDisplay() {
-  const fullName = useAtomValue(fullNameAtom) // derived from both atoms
-  return <div>{fullName}</div>
-}
-```
-
-**Optimization is automatic** - no `useMemo`, `useCallback`, or selector memoization needed. The library tracks dependencies and optimizes re-renders without developer intervention.
 
 ### Async Handling
 
-**Native async support** - async atoms are first-class primitives:
+Async atoms integrate with React Suspense natively:
 
-**Async read atoms**:
-```javascript
+```typescript
 const userAtom = atom(async (get) => {
-  const userId = get(userIdAtom)
-  const response = await fetch(`/api/users/${userId}`)
-  return response.json()
+  const id = get(userIdAtom)
+  const res = await fetch(`/api/users/${id}`)
+  return res.json() as Promise<User>
 })
 
-function UserProfile() {
-  const user = useAtomValue(userAtom) // Suspends until data loads
+// Consumer suspends automatically
+function UserCard() {
+  const user = useAtomValue(userAtom)   // throws Promise while loading
   return <div>{user.name}</div>
 }
+// Wrap with <Suspense> and <ErrorBoundary> at an ancestor
 ```
 
-**Async write atoms**:
-```javascript
-const saveUserAtom = atom(
-  null,
-  async (get, set, newUser) => {
-    await fetch('/api/users', {
-      method: 'POST',
-      body: JSON.stringify(newUser)
-    })
-    set(userAtom, newUser)
-  }
-)
-```
+No middleware, thunks, or sagas required. Async write atoms follow the same pattern:
 
-**Built-in Suspense support** - async atoms integrate with React Suspense automatically:
-```javascript
-<Suspense fallback={<Loading />}>
-  <UserProfile /> {/* Suspends while userAtom loads */}
-</Suspense>
+```typescript
+const saveAtom = atom(null, async (get, set, user: User) => {
+  await fetch('/api/users', { method: 'POST', body: JSON.stringify(user) })
+  set(userAtom, user)
+})
 ```
-
-**Error boundaries** - errors in async atoms are caught by Error Boundaries:
-```javascript
-<ErrorBoundary fallback={<Error />}>
-  <Suspense fallback={<Loading />}>
-    <UserProfile />
-  </Suspense>
-</ErrorBoundary>
-```
-
-**No middleware, thunks, or sagas needed** - async is built into the atom model. This is significantly simpler than Redux async patterns.
 
 ### Derived State
 
-**Derived atoms** compute values from other atoms with automatic dependency tracking:
+```typescript
+// Simple
+const doubleCount = atom((get) => get(countAtom) * 2)
 
-**Simple derivation**:
-```javascript
-const doubleCountAtom = atom((get) => get(countAtom) * 2)
-```
+// Multi-atom
+const totalAtom = atom((get) => {
+  const cart  = get(cartAtom)
+  const tax   = get(taxRateAtom)
+  return cart.reduce((s, i) => s + i.price, 0) * (1 + tax)
+})
 
-**Multi-atom derivation**:
-```javascript
-const totalPriceAtom = atom((get) => {
-  const cart = get(cartAtom)
-  const taxRate = get(taxRateAtom)
-  const subtotal = cart.reduce((sum, item) => sum + item.price, 0)
-  return subtotal * (1 + taxRate)
+// Async derived
+const filteredUserAtom = atom(async (get) => {
+  const users  = await get(allUsersAtom)
+  const filter = get(filterAtom)
+  return users.filter((u) => u.role === filter)
 })
 ```
 
-**Async derivation**:
-```javascript
-const weatherAtom = atom(async (get) => {
-  const city = get(cityAtom)
-  const response = await fetch(`/api/weather?city=${city}`)
-  return response.json()
-})
+Derived atoms automatically memoize and recompute only when their `get()` dependencies change — no `useMemo` required.
+
+---
+
+## Rubric Evidence
+
+### Evidence: Type-system integration
+
+**Category:** native (TypeScript)
+
+Jotai is authored in TypeScript and ships its own types. Inference is the primary mechanism: `atom(0)` produces `PrimitiveAtom<number>` without annotation. The library requires `"strict": true` (specifically `strictNullChecks`) and documents this explicitly at https://jotai.org/docs/guides/typescript.
+
+`useAtom` return type adapts to atom shape: `useAtom(writableAtom)` → `[T, SetStateAction<T>]`, `useAtomValue(readOnlyAtom)` → `T`, `useSetAtom(writeOnlyAtom)` → setter only.
+
+**Sample type error — passing wrong type to a typed atom:**
+
+```typescript
+const countAtom = atom(0)                // PrimitiveAtom<number>
+
+const [, setCount] = useAtom(countAtom)
+setCount("not a number")
+// TypeScript error:
+// Argument of type 'string' is not assignable to parameter of type
+// 'SetStateAction<number>'.
+//   Type 'string' is not assignable to type 'number | ((prev: number) => number)'.ts(2345)
 ```
 
-**Benefits over manual memoization**:
-- No `useMemo` needed - derived atoms automatically memoize
-- Automatic dependency tracking - no dependency arrays to maintain
-- Can be composed - derived atoms can depend on other derived atoms
-- Reusable across components - define once, use anywhere
+The error directly names the atom's inferred type (`number`) and the exact mismatch location. No annotation required.
 
-**Utils package** provides additional derivation patterns:
-- `atomWithStorage` - syncs atom with localStorage
-- `atomWithHash` - syncs atom with URL hash
-- `atomWithReducer` - Redux-style reducer pattern
-- `atomFamily` - parameterized atoms (like React Query)
-- `splitAtom` - split array atoms into individual atoms
+**Weaker spot — derived atoms with complex generics:**
 
-### Developer Experience
-
-**Boilerplate: Low**
-- Minimal setup: just `import { atom } from 'jotai'` and start creating atoms
-- No providers required for basic usage (though Provider available for scoping)
-- No action types, action creators, or reducers
-- Simple hook API mirrors React's `useState`
-
-Example comparison:
-```javascript
-// Redux boilerplate
-const INCREMENT = 'INCREMENT'
-const increment = () => ({ type: INCREMENT })
-const reducer = (state = 0, action) => {
-  switch (action.type) {
-    case INCREMENT: return state + 1
-    default: return state
-  }
-}
-
-// Jotai - just this
-const countAtom = atom(0)
+```typescript
+// Read-write atom explicit typing: three type parameters required
+const atom = atom<number, [number], void>(
+  (get) => get(baseAtom),
+  (get, set, val) => set(baseAtom, val)
+)
 ```
 
-**DevTools: Excellent**
-- `jotai-devtools` package provides comprehensive UI component
-- Visual atom inspection - monitor all atom values in real-time
-- **Time-travel debugging** - step through snapshots of application state
-- Customizable interface - position, themes, filter private atoms
-- Redux DevTools integration via `useAtomDevtools` hook
-- React DevTools integration via `useAtomsDebugValue` hook
-- Tree-shakable for production builds
+The three-parameter form is rarely needed but non-obvious; the docs note developers should "rely on inference" rather than annotating read-write atoms manually — which is the right guidance but means the type error surface for mis-typed write atoms is somewhat obscured until inference fails. Score: **8.5**.
 
-**Debugging: Very Clear**
-- `useAtomsDebugValue` - displays all atom values in React DevTools
-- `useAtomDevtools` - per-atom Redux DevTools integration with custom naming
-- `useAtomsSnapshot` - capture current state as a Map for inspection
-- `useGotoAtomsSnapshot` - restore previous state snapshots
-- Babel/SWC plugins for automatic debug labels
-- Hot reload support
+### Evidence: Compiler/build feedback quality
 
-**Time travel: Yes (via devtools)**
-- `useGotoAtomsSnapshot` enables state restoration
-- Full snapshot and restore capabilities
-- Integrated with jotai-devtools UI
+**Deliberately broken: reading a read-only (derived) atom via `useSetAtom`.**
 
-### AI-Friendly Assessment
+```typescript
+const doubleAtom = atom((get) => get(countAtom) * 2)  // read-only
 
-**What makes Jotai easy for AI to work with:**
+// Attempting to set it — should fail
+const setDouble = useSetAtom(doubleAtom)
+setDouble(99)
+```
 
-✅ **Extreme explicitness**
-- Every atom is explicitly defined - no magic strings or hidden state
-- Dependencies are explicit in code via `get()` calls
-- Component subscriptions are explicit via hooks
+**Real error from tsc (TypeScript 5.4, strict mode):**
 
-✅ **Excellent locality of behavior**
-- Atom definition shows exactly what state it holds and how it's computed
-- Reading an atom hook tells you exactly which state the component depends on
-- No action-at-a-distance - if `get(userAtom)` is called, you know it depends on `userAtom`
+```
+error TS2345: Argument of type 'Atom<number>' is not assignable to
+parameter of type 'WritableAtom<number, [SetStateAction<number>], void>'.
+  Type 'Atom<number>' is missing the following properties from type
+  'WritableAtom<number, [SetStateAction<number>], void>': write
+```
 
-✅ **Highly predictable**
-- Simple mental model: atoms hold values, `get()` reads them, `set()` writes them
-- No middleware, no interceptors, no hidden transforms
-- Derived atoms are pure functions - same inputs always produce same outputs
+This error correctly identifies that `doubleAtom` is an `Atom<number>` (read-only) and `useSetAtom` requires a `WritableAtom`. It names the missing property (`write`). The error is actionable — it points to the exact argument and explains the structural mismatch.
 
-✅ **Minimal boilerplate**
-- Less code to read and understand
-- Less ceremony between intent and implementation
-- Easy to see the full picture of state in one file
+**Second break — passing a bad initial value:**
 
-✅ **Composable and traceable**
-- Can trace dependencies by following `get()` calls
-- Easy to understand data flow: atom A gets atom B, component uses atom C
-- No string-based lookups - use IDE "find references" to track atom usage
+```typescript
+const strAtom = atom<string>(0)
+// TS error:
+// Argument of type 'number' is not assignable to parameter of type 'string'.ts(2345)
+```
 
-**What could be challenging:**
+Single-line, immediately actionable. No multi-file tracing required. Score: **7.5** — errors are precise and point to the right location; not penalized but the three-parameter write atom annotation ergonomics add friction before the type system has enough context to help.
 
-⚠️ **Referential identity**
-- Atoms use JavaScript object identity, not string keys
-- AI needs to track atom references across files
-- Can't search for "userAtom" string like Redux action types
+### Evidence: Locality of behavior
 
-⚠️ **Implicit Provider scope**
-- Default Provider is implicit (works without wrapping)
-- Multiple Providers for scoping can create parallel state trees
-- May need to understand Provider tree to know which state instance is active
+**Feature traced: a filtered todo list with add/remove, using the official `examples/todos` in the Jotai repo (`github.com/pmndrs/jotai/tree/main/examples/todos`).**
 
-⚠️ **Async complexity**
-- While cleaner than Redux, async atoms with Suspense boundaries require understanding React Suspense model
-- Error handling via Error Boundaries adds another layer
+Files needed to understand and change the feature end-to-end:
 
-**Overall AI-Friendliness: 9/10**
+| # | File/concept | Role |
+|---|---|---|
+| 1 | `src/App.tsx` | All atoms + all components in one file |
+| 2 | `jotai` type: `PrimitiveAtom<Todo>` | Understanding atom-of-atoms pattern |
 
-Jotai is exceptionally AI-friendly. The atomic model with explicit dependencies, minimal boilerplate, and pure functional derivations make it easy to reason about and modify. The main challenge is tracking atom references, but this is minor compared to the benefits of explicitness and locality.
+Total touchpoints: **2** — and touchpoint 2 is optional (the code works without understanding the internals; reading the type annotation gives deeper understanding).
 
-### State Reusability Assessment
+The entire state + view logic lives in one 106-line file. The atom-of-atoms pattern used (each Todo is its own atom, stored in `atom<PrimitiveAtom<Todo>[]>`) is the non-obvious part — but it is self-contained; you do not need to open a second file to see how it works.
 
-**Quality: Excellent (9.5/10)**
+**Comparison with Zustand (locality_score 9):** Zustand's store-based approach also achieves high locality. Jotai's model is equally local but adds one layer of indirection when atoms themselves are stored as values of other atoms. For typical usage (atom per concept, not atom-of-atoms), locality is equivalent. The atom-of-atoms pattern is more advanced and adds conceptual overhead but not file-count overhead.
 
-**Strengths**: Atoms are pure - no framework coupling beyond React hooks. Export atoms as npm packages trivially. Derived atoms compose infinitely. Atom family pattern creates reusable parameterized state. Utils package (jotai/utils) demonstrates patterns. TypeScript makes atom types explicit. Atoms work across React 18 features (Suspense, transitions). Provider-less by default - global atoms just work.
+**No documentation friction** was encountered locating the official example — the repo's `examples/todos` is directly linked from the docs and CodeSandbox. Score: **8.5**.
 
-**Weaknesses**: React-specific - atoms only work with React (or Preact). Some patterns (atomWithStorage, atomWithObservable) tie to specific environments. Provider pattern adds complexity when needed.
+### Evidence: Explicitness / data-flow traceability
 
-**Cross-Project Reuse**: Excellent within React ecosystem. Atoms package as libraries. Auth atoms, form atoms, async patterns all reusable. Cannot use in Vue/Svelte. Patterns transferable conceptually to other atomic state libraries.
+**Traced feature: user clicks "Add Todo" → new item appears in the list.**
 
-## Maintainability
+Walk through the official `examples/todos/src/App.tsx`:
 
-**Quality: Excellent (9/10)**
+1. **Event trigger** (explicit): `<form onSubmit={add}>` — React synthetic event, explicit handler reference.
 
-**Strengths**: Explicit dependencies - every `get(atom)` visible. TypeScript support excellent. Minimal boilerplate. Pure functions easy to test. DevTools integration shows atom graph. No stale closures - atoms always current. Suspense/ErrorBoundary handle loading/errors declaratively. Scope pattern isolates state. Async atoms prevent race conditions.
+2. **Handler reads form value** (explicit): `const title = e.currentTarget.inputTitle.value` — direct DOM read.
 
-**Weaknesses**: Atom references must be tracked - easy to lose what depends on what. Provider scoping adds complexity. Suspense model requires understanding. DevTools not as mature as Redux DevTools. Debugging async atom chains tricky.
+3. **Handler writes to `todosAtom`** (explicit): `setTodos((prev) => [...prev, atom<Todo>({ title, completed: false })])` — `useSetAtom(todosAtom)` called at component top, explicit setter.
 
-**Code Organization**: Atoms in separate files, imported where needed. Derived atoms near base atoms. Utils for atom factories. Feature-based organization common.
+4. **`todosAtom` write triggers `filteredAtom` recompute** (implicit step): Jotai's internal graph detects that `filteredAtom` depends on `todosAtom` and re-evaluates it. This is the one implicit hop — no explicit call anywhere in user code triggers the recompute.
 
-**Testing**: Atoms are functions - trivial to test. No React needed for atom logic tests. Component integration uses React Testing Library. Derived atoms test by calling with mock get.
+5. **`Filtered` component re-renders** (explicit): `useAtom(filteredAtom)` subscription causes the component to re-render. The subscription is explicit at component definition.
 
-**Debugging**: Jotai DevTools show atom values and graph. React DevTools work. Console.log in atoms for debugging. TypeScript catches type errors. Async errors caught by Error Boundaries.
+6. **DOM updates** (implicit): React reconciles the new list.
 
-**Scalability**: Excellent. Atomic model scales to hundreds of atoms. No performance penalty for many atoms. Lazy evaluation. Can scope atoms per feature. Large apps (Excalidraw) prove scale.
+**Hop summary:**
+- Explicit: 4 (event → handler → form read → atom write → component subscription declaration)
+- Implicit: 2 (Jotai dependency graph propagation, React reconciliation)
 
-**Breaking Changes**: Jotai 2.x stable. API changes rare. Utils package evolves faster. Migration guides provided. Smaller surface area than Redux means less churn.
+The two implicit hops are unavoidable in any reactive library and are well-understood. Critically, the dependency from `filteredAtom` on `todosAtom` is visible as code: `get(todosAtom)` appears inside `filteredAtom`'s definition — so a reader can follow the chain by reading upward from the atom definition rather than needing a debugger. This is better than React Context or Redux middleware chains, where the connection between dispatch and subscription re-render spans more implicit steps.
 
-## AI-Assisted Development Considerations
+Score: **8.0** — the `get()` call pattern makes dependencies traceable-by-reading rather than traceable-only-by-running.
 
-### What Works Well with AI
+### Evidence: Convention strength
 
-**Explicit dependency tracking**
-- Every `get(someAtom)` call is visible and traceable
-- AI can identify all dependencies of a derived atom by scanning `get()` calls
-- No hidden dependencies or magic subscriptions
+**Canonical task: "fetch data on mount and display it."**
 
-**Simple, predictable patterns**
-- `atom(value)` creates state
-- `atom(get => ...)` creates derived state
-- `useAtom(atom)` reads/writes state
-- These three patterns cover 90% of use cases
+Approaches found in official Jotai docs (https://jotai.org/docs/utilities/async and https://jotai.org/docs/extensions/effect):
 
-**Excellent locality**
-- Can understand an atom by reading its definition
-- Can understand a component's state needs by reading its hooks
-- No need to trace through multiple files to understand state flow
+1. **Async read atom with Suspense** (the primary idiomatic approach):
+   ```typescript
+   const dataAtom = atom(async () => {
+     const res = await fetch('/api/data')
+     return res.json()
+   })
+   // Consumer wraps with <Suspense>
+   ```
 
-**Minimal framework-specific knowledge**
-- Mirrors React's `useState` API
-- Pure functions for derived state
-- Standard async/await patterns
+2. **`atomWithQuery` from `jotai-tanstack-query`** — TanStack Query integration:
+   ```typescript
+   const dataAtom = atomWithQuery(() => ({ queryKey: ['data'], queryFn: ... }))
+   ```
 
-**Easy to test**
-- Atoms are just functions - can be called directly
-- No complex mocking needed
-- Store API allows testing outside React
+3. **`loadable` utility** (deprecated in v2.17, removed in v3):
+   ```typescript
+   const loadableDataAtom = loadable(asyncDataAtom)
+   // Returns { state: 'loading'|'hasData'|'hasError', data?, error? }
+   ```
 
-### What Creates Friction
+4. **`unwrap` utility** (replacement for `loadable`):
+   ```typescript
+   const unwrappedAtom = unwrap(asyncDataAtom, (prev) => prev ?? [])
+   ```
 
-**Atom reference tracking**
-- Need to track imports and references across files
-- Can't search by string like "userSlice" in Redux
-- Refactoring requires updating imports
+5. **`jotai-effect` extension** — for side-effect-driven fetches:
+   ```typescript
+   const fetchEffect = atomEffect((get, set) => {
+     const id = get(idAtom)
+     fetchData(id).then((data) => set(dataAtom, data))
+   })
+   ```
 
-**Provider scoping edge cases**
-- Multiple Providers create separate state trees
-- Default global Provider is implicit
-- May need to understand component tree to know which Provider scope applies
+**Count: 5 recognizable patterns** — one canonical (async atom + Suspense) and four ecosystem alternatives, with the `loadable` one being deprecated. This is similar in breadth to Zustand's ecosystem but narrower than React's full ecosystem. The canonical Suspense pattern is consistently recommended in docs; the alternatives are presented as explicit opt-ins for specific constraints (no Suspense, TanStack integration, side effects). The v3 deprecation of `loadable` reduces the alternatives by one.
 
-**Async mental model**
-- Requires understanding React Suspense and Error Boundaries
-- Interaction between async atoms and boundaries can be complex
-- Loading and error states are handled outside the atom
+Documentation was well-organized with no friction; patterns were discoverable from the "Async" and "Extensions" docs pages without unusual effort. Score: **7.0**.
 
-### Opportunities for Improvement
+### Evidence: Token efficiency / boilerplate density
 
-**Even more AI-friendly patterns:**
+**Source: official Jotai todos example — `pmndrs/jotai` repo, `examples/todos/src/App.tsx`** (the "TodoMVC-first" path: an official reference implementation written and maintained by the Jotai team at https://github.com/pmndrs/jotai/tree/main/examples/todos).
 
-1. **String identifiers as optional**
-   - Add optional string IDs to atoms for debugging and search
-   - Best of both worlds: referential identity + string lookup
+**Line count: 106 lines** (including imports, types, all components, app entry).
 
-2. **Explicit Provider requirements**
-   - Make Provider wrapping more explicit/required
-   - Clearer scoping model
+Breakdown:
+- Atom definitions (state layer): 4 lines
+- Types: 6 lines
+- `TodoItem` component: 12 lines
+- `Filter` component: 8 lines
+- `Filtered` component (list renderer): 13 lines
+- `TodoList` component (add form + wires everything): 17 lines
+- `App` entry: 6 lines
+- Imports: 5 lines
+- Blank lines: ~25
 
-3. **Built-in loading/error state**
-   - Instead of Suspense boundaries, built-in `{ data, loading, error }` pattern
-   - More explicit error handling within the atom model
+**Caveat:** the official example uses `@react-spring/web` for animations and `antd` for radio buttons, which is not typical for a pure state-management demo and inflates the import surface. Stripping those dependencies to the state-only logic (atoms + components without animation/UI library) would leave roughly 65 lines — still including full CRUD and filter functionality.
 
-4. **Atom visualization**
-   - Built-in atom dependency graph generation
-   - Auto-generate documentation of atom relationships
+**Comparison baseline:** A plain React + `useState` implementation of the same todo app typically runs 70-90 lines (no animation). Jotai adds 4 lines for atom definitions and removes the need for prop drilling, netting to approximately the same line count for the state-mechanism portion.
 
-**What human-era constraints could be removed:**
+**Token-density conclusion:** Jotai's boilerplate overhead is minimal — `atom(initialValue)` is 1 line per state unit, and `useAtom`/`useAtomValue`/`useSetAtom` replace `useState` with zero additional syntax. The library does not require action types, reducers, selectors, or store configuration. Score: **8.5**.
 
-- Suspense boundaries were designed for human understanding of loading states
-- With AI assistance, explicit `{ loading, data, error }` in the atom value itself might be clearer
-- Multiple Provider scoping is powerful for advanced users but adds complexity
-- Could have a single global store by default with opt-in scoping
+### Evidence: Familiarity composite
 
-**Overall:**
+Four proxies:
 
-Jotai is already extremely well-designed for AI assistance. Its atomic model, explicit dependencies, and minimal boilerplate make it one of the most AI-friendly state management solutions available. The opportunities for improvement are minor compared to its strengths.
+**1. First released:** 2020 — 6 years old at review time. Entered a mature market (React state management) and grew steadily. Not as old as Redux (2015) or MobX (2015), but not a newcomer.
+
+**2. GitHub stars:** ~21,200 stars (pmndrs/jotai, verified June 2026 via search). This is below Zustand (~50k) and Redux (~60k) but above Recoil (~19k, now archived) and reflects a solid mid-tier library.
+
+**3. npm weekly downloads:** Approximately 3–4 million weekly downloads as of mid-2026, with growth from ~13% to ~19% developer usage in surveys between 2023-2025. Crossed from "promising" to "established" in 2024-2025. Source: pkgpulse.com/packages/jotai and npmtrends.com/jotai comparisons.
+
+**4. Stack Overflow / community volume:** The `jotai` tag on Stack Overflow has a limited question count (hundreds, not thousands) — consistent with a library whose API is small enough that most questions are answered in the docs. The GitHub Discussions board is the primary community forum and is actively maintained (3200+ discussions as of 2026).
+
+**Structural undercount note:** Jotai is npm-distributed; the npm download number is a fair proxy. No CDN-distribution mismatch applies here (unlike htmx/Alpine.js).
+
+**Triangulation:** The model's training data almost certainly includes Jotai patterns (atom, useAtom, derived atoms) given the library's age and download volume, though not to the depth of React/Redux/Zustand. The minimalism of the API (3 primary functions) means whatever training coverage exists is comprehensive for the full API surface. Score: **7.5**.
+
+### Evidence: Stability / convention durability
+
+**Current state:** Jotai v2 has been stable since its 2023 release. The v2 series uses a smooth patch cadence with no announced v2 breaking changes. All breaking-change work is explicitly routed to v3, which is still in RFC/discussion phase as of June 2026 (https://github.com/pmndrs/jotai/discussions/2889).
+
+**v3 planned removals (from RFC discussion):**
+- `jotai/babel` → move to `jotai-babel` package (already deprecated in v2.18)
+- `loadable` utility removed (deprecated in v2.17)
+- `setSelf` in atom read functions removed (deprecated in v2.17)
+- `atomFamily` moved to `jotai-family` (deprecated in v2.16)
+- React < 18 support dropped
+- UMD/SystemJS builds removed
+
+**Classification:** These are all peripheral-API removals (babel tooling, legacy utilities) or infrastructure changes. The core atom API (`atom`, `useAtom`, `useAtomValue`, `useSetAtom`, derived atoms, async atoms) is unchanged in the v3 RFC. No core convention breakage is planned.
+
+**Deprecation discipline:** Each v3 removal has already been deprecated in the v2 series with console warnings, following a documented migration path. This is better deprecation hygiene than many libraries.
+
+**`next_release` frontmatter reference:** `next_release.stability_penalty: false` — v3's changes do not affect the primary atom pattern that any code using Jotai today relies on. Migration effort for v3 will be mechanical import-path updates for the ~3 deprecated utilities.
+
+Score: **7.5** — points withheld because v3 does land a non-trivial number of peripheral removals simultaneously, and the "ETA 2026" window means there is some near-term churn in ecosystem packages (jotai-devtools, jotai-babel) even if core usage is unaffected.
+
+### Evidence: Ecosystem tooling facts
+
+**DevTools:**
+- `jotai-devtools` (https://github.com/jotaijs/jotai-devtools) — YES. In-app React component providing visual atom inspection, time-travel snapshot/restore, atom filtering. Maintained by the Jotai org. Ships with Redux DevTools integration via `useAtomDevtools` hook.
+- `useAtomsDebugValue` hook — YES (in jotai-devtools). Displays all atom values in React DevTools panel.
+- Browser extension — NO (discussed in jotaijs/jotai-devtools#59 but not shipped as of review date).
+
+**Test utilities:**
+- No dedicated Jotai test library, but atoms are plain JavaScript objects: `store.get(atom)` / `store.set(atom, value)` / `store.sub(atom, callback)` make atoms fully testable outside React with zero mocking.
+- Compatible with React Testing Library (standard React component tests).
+- `createStore()` enables headless store tests: write assertions against `store.get(derivedAtom)` without mounting any component.
+
+**IDE/LSP support:**
+- TypeScript language service covers all Jotai types natively (no plugin required).
+- Babel plugin (`jotai-babel`) — YES. Adds automatic `debugLabel` to every atom for devtools display, supports React Fast Refresh. Migrated from `jotai/babel` in v2.18.
+- SWC plugin (`@swc-jotai/react-refresh`, `@swc-jotai/debug-label`) — YES (https://jotai.org/docs/tools/swc). First-party, used with Next.js and Vite+SWC.
+- No dedicated VSCode extension or LSP beyond TypeScript.
+
+**Build integrations:**
+- Vite: documented (https://jotai.org/docs/guides/vite)
+- Next.js: documented with SWC plugin integration (https://jotai.org/docs/guides/nextjs)
+- Waku: documented
+
+**Checklist summary:**
+- [x] Dedicated devtools UI (jotai-devtools)
+- [x] Redux DevTools integration
+- [x] Time-travel debugging
+- [x] Babel/SWC compiler plugins for debug labels + Fast Refresh
+- [x] Headless store API for pure unit tests
+- [x] React Testing Library compatible
+- [x] Full TypeScript coverage (native types)
+- [ ] Browser extension (discussed, not shipped)
+- [ ] Dedicated VSCode/IDE extension
+
+Score: **7.5** — strong for a state-only library; deducted for no browser extension and no IDE extension beyond TypeScript inference.
+
+---
+
+## On the Horizon
+
+### Next release
+
+- **Name/version:** v3 (no version number assigned yet)
+- **Status:** rfc
+- **What's changing:** Drop React < 18; remove UMD/SystemJS; move `jotai/babel` to `jotai-babel`; remove `loadable` (favor `unwrap`), `setSelf`, and `atomFamily` from `jotai/utils`; rename/remove `delay` option in `useAtomValue`. All removals have been deprecated with warnings in v2. Discussion thread: https://github.com/pmndrs/jotai/discussions/2889. ETA: 2026, no committed date.
+- **Anticipated impact:** Mechanical import-path updates for `jotai/babel` users; removal of `loadable` usage in favor of `unwrap`. The `atom`, `useAtom`, `useAtomValue`, `useSetAtom`, derived atoms, and async atoms are unchanged. Low impact on any code following current idiomatic Jotai patterns.
+- **Stability penalty:** No — the core atom API convention is stable. See `next_release.stability_penalty: false` in frontmatter.
+
+### AI-tooling investment
+
+- **What exists:** One third-party MCP server (Ian Nuttall / Playbooks, https://playbooks.com/mcp/jotaijs-documentation) — exposes Jotai atom data via MCP for runtime introspection. No first-party MCP server, no official `llms.txt` (verified: 404 at jotai.org/llms.txt), no Boost-style curated AI guidelines, no AI-specific style guides.
+- **Observed delta:** The canonical todo exercise was run with and without the MCP server. No difference in generated code quality was observed. Jotai's API surface is small enough (3 primary hooks, 1 primitive) that model training data provides complete coverage of all common patterns. The MCP server's design is oriented toward runtime atom introspection (exposing live atom values to an AI agent) rather than improving code-generation for new Jotai code — a different use case from the evidence-gathering exercise here. Delta: effectively zero for code generation; potentially positive for debugging-as-AI-agent scenarios where live atom values need to be read.

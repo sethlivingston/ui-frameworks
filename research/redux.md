@@ -1,996 +1,543 @@
 ---
-name: "Redux (Redux Toolkit)"
+name: "Redux (Redux Toolkit + React-Redux)"
 category: "state-library"
 github_url: "https://github.com/reduxjs/redux-toolkit"
 docs_url: "https://redux-toolkit.js.org"
 implementation_language: "TypeScript"
 status: "active"
-type_system_score: null
-compiler_feedback_score: null
-locality_score: null
-explicitness_score: null
-convention_strength_score: null
-token_efficiency_score: null
-familiarity_score: null
-stability_score: null
-tooling_score: null
+type_system_score: 8
+compiler_feedback_score: 6.5
+locality_score: 4.5
+explicitness_score: 8.5
+convention_strength_score: 7
+token_efficiency_score: 5
+familiarity_score: 9
+stability_score: 8
+tooling_score: 9
+version: "RTK 2.12.0 / redux 5.0.1 / react-redux 9.3.0"
+npm_package: "@reduxjs/toolkit"
+ai_tooling:
+  mcp_server:
+    available: false
+    url: null
+    party: null
+  guidelines: "Agent skill files shipped inside the RTK npm package itself (skills/ folder, v2.12.0+). Point your agent at the package or run `npx @tanstack/intent@latest install` to install. Covers modern RTK usage, migration, client/server state, and side effects."
+  llms_txt: false
+  style_guides: null
+  observed_delta: "With the skills files active, an AI agent receives curated guidance on the builder-callback extraReducers pattern and the RTK Query tag-based cache-invalidation model — two areas where agents most often produce outdated or subtly wrong code. In a test generation of a todo-list slice with createAsyncThunk, the skills-informed pass produced correct builder.addCase chains on the first attempt; the uninformed pass defaulted to the legacy object-notation extraReducers (no longer valid in RTK v2), requiring one correction cycle. The delta is modest but real: the skills files patch the single highest-entropy pattern (extraReducers syntax) and the cache-invalidation model."
+next_release:
+  name: "RTK v2.x (ongoing patch releases)"
+  status: "announced"
+  changes: "Incremental TypeScript improvements, RTK Query refinements, agent skill file maintenance. v2.12.0 was the last major feature release (May 2026). No major breaking changes on the roadmap; v2.x is in a steady-evolution phase."
+  anticipated_impact: "Low impact on rubric scores. TypeScript improvements may marginally raise compiler_feedback_score over time."
+  stability_penalty: false
+components: null
+supersedes: null
+superseded_by: null
+typescript_support: "native"
+license: "MIT"
+runtime: "both"
 capabilities:
-  state_management: false
+  state_management: true
   rendering: false
   event_handling: false
+paradigm: "declarative"
+state_model: "reducers"
+maintainer: "Redux Team (Mark Erikson, community)"
+first_released: "2015"
+reviewed_date: "2026-06-09"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Reviewed as the recommended ecosystem: Redux Toolkit (RTK) + React-Redux. Bare Redux without RTK is explicitly discouraged by official docs. The TodoMVC example in the official Redux repo (github.com/reduxjs/redux/tree/master/examples/todomvc) uses pre-RTK patterns and is explicitly marked 'outdated, shows legacy patterns' in its README — it was used for line-count comparison but the RTK-idiomatic rewrite is the primary evidence for token_efficiency."
 ---
 
-# Redux (Redux Toolkit)
+# Redux (Redux Toolkit + React-Redux)
 
-## Philosophy & Mental Model
-
-Redux is **"a predictable state container for JavaScript apps."** Redux Toolkit (RTK) is **"the official, opinionated, batteries-included toolset for efficient Redux development."**
-
-Redux established the **Flux architecture** for frontend apps: unidirectional data flow, single source of truth, immutable state updates. For years, Redux was synonymous with React state management—before simpler alternatives like Zustand emerged.
-
-**Mental model**: Think of Redux as **"a database for your frontend."** The store is the database, reducers are table schemas, actions are SQL commands, and selectors are queries. Everything is **explicit, traceable, and deterministic**.
-
-**Core principles** (from the official docs):
-
-1. **Single Source of Truth**: The entire application state lives in one store. No scattered state across components.
-
-2. **State is Read-Only**: You never mutate state directly. Instead, you dispatch actions that describe what happened.
-
-3. **Changes Made with Pure Functions**: Reducers are pure functions that take `(state, action)` and return new state. No side effects.
-
-Redux Toolkit modernizes this by **eliminating boilerplate** while preserving the core philosophy. RTK uses Immer internally so you can write "mutating" code that's actually immutable under the hood.
-
-**Who Redux is for:**
-- Large apps with complex state
-- Teams needing strong conventions
-- Apps requiring time-travel debugging or state persistence
-- Developers who value explicit over implicit
-
-**Who Redux is NOT for:**
-- Simple apps (Zustand or Context is easier)
-- Developers allergic to boilerplate (even RTK has more than Zustand)
-- Projects prioritizing minimal bundle size
+Redux is a predictable state container for JavaScript apps. Redux Toolkit (RTK) is the official, opinionated toolset that eliminates the boilerplate from classic Redux while preserving its core principles: single source of truth, read-only state, and pure reducer functions. The ecosystem reviewed here is RTK + React-Redux — the unit a developer actually works with today.
 
 ## State Management
 
+### Philosophy & Mental Model
+
+Redux models application state as a single immutable store. Changes happen only via dispatched actions, processed by pure reducer functions. This "database for your frontend" model makes every state transition explicit and auditable — the entire action history can be replayed.
+
+RTK modernizes this with:
+- `createSlice` — combines reducers + action creators in one call
+- Immer under the hood — lets you write "mutating" reducer code that produces immutable results
+- `createAsyncThunk` — generates `pending/fulfilled/rejected` action lifecycle
+- RTK Query — opinionated data-fetching layer with automatic caching and cache invalidation
+
 ### Core Primitives
 
-**Create a slice** (combines reducer + actions):
-
 ```typescript
+// Slice: the fundamental unit of modern Redux
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-interface CounterState {
-  value: number;
-  status: 'idle' | 'loading';
+interface TodosState {
+  items: { id: string; text: string; completed: boolean }[];
+  filter: 'all' | 'active' | 'completed';
 }
 
-const initialState: CounterState = {
-  value: 0,
-  status: 'idle',
-};
+const initialState: TodosState = { items: [], filter: 'all' };
 
-const counterSlice = createSlice({
-  name: 'counter',
+const todosSlice = createSlice({
+  name: 'todos',
   initialState,
   reducers: {
-    increment: (state) => {
-      state.value += 1; // Looks like mutation, but Immer makes it immutable!
+    addTodo: (state, action: PayloadAction<string>) => {
+      state.items.push({ id: crypto.randomUUID(), text: action.payload, completed: false });
     },
-    decrement: (state) => {
-      state.value -= 1;
+    toggleTodo: (state, action: PayloadAction<string>) => {
+      const todo = state.items.find(t => t.id === action.payload);
+      if (todo) todo.completed = !todo.completed;
     },
-    incrementByAmount: (state, action: PayloadAction<number>) => {
-      state.value += action.payload;
+    clearCompleted: (state) => {
+      state.items = state.items.filter(t => !t.completed);
+    },
+    setFilter: (state, action: PayloadAction<TodosState['filter']>) => {
+      state.filter = action.payload;
     },
   },
 });
 
-export const { increment, decrement, incrementByAmount } = counterSlice.actions;
-export default counterSlice.reducer;
+export const { addTodo, toggleTodo, clearCompleted, setFilter } = todosSlice.actions;
+export default todosSlice.reducer;
 ```
 
-**Configure the store**:
-
 ```typescript
+// Store: one configureStore call wires everything
 import { configureStore } from '@reduxjs/toolkit';
-import counterReducer from './counterSlice';
+import todosReducer from './todosSlice';
 
 export const store = configureStore({
-  reducer: {
-    counter: counterReducer,
-  },
+  reducer: { todos: todosReducer },
 });
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 ```
 
-**Provide to React**:
-
 ```typescript
-import { Provider } from 'react-redux';
-import { store } from './store';
-
-function App() {
-  return (
-    <Provider store={store}>
-      <YourApp />
-    </Provider>
-  );
-}
-```
-
-### Update Mechanism
-
-**Dispatch actions** to update state:
-
-```typescript
-import { useDispatch } from 'react-redux';
-import { increment, decrement, incrementByAmount } from './counterSlice';
-
-function Counter() {
-  const dispatch = useDispatch();
-
-  return (
-    <div>
-      <button onClick={() => dispatch(decrement())}>-</button>
-      <button onClick={() => dispatch(increment())}>+</button>
-      <button onClick={() => dispatch(incrementByAmount(5))}>+5</button>
-    </div>
-  );
-}
-```
-
-**Immer-powered "mutations"** (RTK only):
-
-```typescript
-const todosSlice = createSlice({
-  name: 'todos',
-  initialState: [],
-  reducers: {
-    addTodo: (state, action) => {
-      state.push(action.payload); // Looks like mutation, actually immutable
-    },
-    toggleTodo: (state, action) => {
-      const todo = state.find((t) => t.id === action.payload);
-      if (todo) {
-        todo.completed = !todo.completed; // Direct "mutation"
-      }
-    },
-  },
-});
-```
-
-Under the hood, Immer creates immutable copies. You write mutable code, get immutable behavior.
-
-### Read Pattern
-
-**useSelector** hook:
-
-```typescript
-import { useSelector } from 'react-redux';
-import { RootState } from './store';
-
-function CounterDisplay() {
-  const count = useSelector((state: RootState) => state.counter.value);
-  return <h1>{count}</h1>;
-}
-```
-
-Selector function extracts specific data from state. Component re-renders when that data changes (reference equality check).
-
-**Typed hooks** (recommended pattern):
-
-```typescript
-import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
+// Typed hooks — the recommended pattern since RTK v2
+import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from './store';
 
-export const useAppDispatch: () => AppDispatch = useDispatch;
-export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
-
-// Usage
-const count = useAppSelector((state) => state.counter.value);
-const dispatch = useAppDispatch();
+export const useAppDispatch = useDispatch.withTypes<AppDispatch>();
+export const useAppSelector = useSelector.withTypes<RootState>();
 ```
-
-This provides full TypeScript autocomplete.
-
-### Reactivity & Granularity
-
-Redux uses **reference equality** to determine if state changed:
-
-```typescript
-const count = useSelector((state) => state.counter.value);
-// Re-renders only when state.counter.value changes (by value)
-
-const counter = useSelector((state) => state.counter);
-// Re-renders when ANY property in state.counter changes
-```
-
-**Memoized selectors** with Reselect:
-
-```typescript
-import { createSelector } from '@reduxjs/toolkit';
-
-const selectTodos = (state: RootState) => state.todos;
-const selectFilter = (state: RootState) => state.filter;
-
-export const selectFilteredTodos = createSelector(
-  [selectTodos, selectFilter],
-  (todos, filter) => {
-    switch (filter) {
-      case 'completed':
-        return todos.filter((t) => t.completed);
-      case 'active':
-        return todos.filter((t) => !t.completed);
-      default:
-        return todos;
-    }
-  }
-);
-
-// Usage
-const filteredTodos = useAppSelector(selectFilteredTodos);
-```
-
-`createSelector` memoizes results—only recomputes when inputs change.
 
 ### Async Handling
 
-**createAsyncThunk** for async actions:
-
 ```typescript
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk } from '@reduxjs/toolkit';
 
-interface User {
-  id: number;
-  name: string;
-}
-
-export const fetchUsers = createAsyncThunk<User[]>(
-  'users/fetchUsers',
+export const fetchTodos = createAsyncThunk<Todo[], void>(
+  'todos/fetchAll',
   async () => {
-    const response = await fetch('/api/users');
-    return response.json();
+    const res = await fetch('/api/todos');
+    return res.json();
   }
 );
 
-const usersSlice = createSlice({
-  name: 'users',
-  initialState: {
-    entities: [] as User[],
-    loading: 'idle' as 'idle' | 'pending' | 'succeeded' | 'failed',
-    error: null as string | null,
-  },
-  reducers: {},
-  extraReducers: (builder) => {
-    builder
-      .addCase(fetchUsers.pending, (state) => {
-        state.loading = 'pending';
-      })
-      .addCase(fetchUsers.fulfilled, (state, action) => {
-        state.loading = 'succeeded';
-        state.entities = action.payload;
-      })
-      .addCase(fetchUsers.rejected, (state, action) => {
-        state.loading = 'failed';
-        state.error = action.error.message || null;
-      });
-  },
-});
-
-// Usage
-const dispatch = useAppDispatch();
-dispatch(fetchUsers());
+// In the slice, extraReducers handles the three lifecycle actions
+extraReducers: (builder) => {
+  builder
+    .addCase(fetchTodos.pending, (state) => { state.status = 'loading'; })
+    .addCase(fetchTodos.fulfilled, (state, action) => {
+      state.status = 'idle';
+      state.items = action.payload;
+    })
+    .addCase(fetchTodos.rejected, (state, action) => {
+      state.status = 'failed';
+      state.error = action.error.message ?? null;
+    });
+},
 ```
 
-`createAsyncThunk` automatically generates `pending`, `fulfilled`, and `rejected` action types.
-
-**RTK Query** (for data fetching):
+RTK Query is the recommended approach for server state (replaces the thunk pattern above for most data fetching):
 
 ```typescript
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-export const api = createApi({
+export const todosApi = createApi({
+  reducerPath: 'todosApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
+  tagTypes: ['Todo'],
   endpoints: (builder) => ({
-    getUsers: builder.query<User[], void>({
-      query: () => 'users',
-    }),
-    getUserById: builder.query<User, number>({
-      query: (id) => `users/${id}`,
-    }),
-    createUser: builder.mutation<User, Partial<User>>({
-      query: (body) => ({
-        url: 'users',
-        method: 'POST',
-        body,
-      }),
+    getTodos: builder.query<Todo[], void>({ query: () => 'todos', providesTags: ['Todo'] }),
+    addTodo:  builder.mutation<Todo, string>({
+      query: (text) => ({ url: 'todos', method: 'POST', body: { text } }),
+      invalidatesTags: ['Todo'],
     }),
   }),
 });
 
-export const { useGetUsersQuery, useGetUserByIdQuery, useCreateUserMutation } = api;
-
-// Usage
-function UserList() {
-  const { data: users, isLoading, error } = useGetUsersQuery();
-
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error</div>;
-  return <ul>{users.map((u) => <li>{u.name}</li>)}</ul>;
-}
+export const { useGetTodosQuery, useAddTodoMutation } = todosApi;
 ```
-
-RTK Query auto-generates hooks, handles caching, deduplication, and refetching.
-
-### Derived State
-
-**Selectors** compute derived data:
-
-```typescript
-const selectTotalPrice = (state: RootState) =>
-  state.cart.items.reduce((total, item) => total + item.price, 0);
-
-const totalPrice = useAppSelector(selectTotalPrice);
-```
-
-**Memoized selectors** for expensive computations:
-
-```typescript
-import { createSelector } from '@reduxjs/toolkit';
-
-const selectItems = (state: RootState) => state.cart.items;
-
-const selectTotalPrice = createSelector([selectItems], (items) =>
-  items.reduce((total, item) => total + item.price * item.quantity, 0)
-);
-
-const selectItemCount = createSelector([selectItems], (items) =>
-  items.reduce((total, item) => total + item.quantity, 0)
-);
-```
-
-Selectors only recompute when inputs change.
 
 ## Rendering
 
-Redux is **state-only**—rendering is handled by React:
+Redux is state-only. Rendering is React's job. React-Redux's `useSelector` subscribes a component to a slice of store state; when that slice changes (by reference equality), React re-renders the component.
 
 ```typescript
-function Counter() {
-  const count = useAppSelector((state) => state.counter.value);
+function TodoList() {
+  const items = useAppSelector(state => state.todos.items);
+  const filter = useAppSelector(state => state.todos.filter);
   const dispatch = useAppDispatch();
 
+  const visible = items.filter(t =>
+    filter === 'all' ? true :
+    filter === 'active' ? !t.completed : t.completed
+  );
+
   return (
-    <div>
-      <h1>{count}</h1>
-      <button onClick={() => dispatch(increment())}>+</button>
-    </div>
+    <ul>
+      {visible.map(todo => (
+        <li key={todo.id} onClick={() => dispatch(toggleTodo(todo.id))}>
+          {todo.text}
+        </li>
+      ))}
+    </ul>
   );
 }
 ```
 
-Redux triggers re-renders via React's subscription mechanism when selected state changes.
-
 ## Event Handling
 
-**Actions are dispatched** in response to events:
+Events dispatch actions. Redux has no event system of its own; all user interaction flows through `dispatch`.
 
 ```typescript
-function TodoInput() {
+function NewTodoInput() {
   const [text, setText] = useState('');
   const dispatch = useAppDispatch();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(addTodo({ id: Date.now(), text, completed: false }));
-    setText('');
+    if (text.trim()) {
+      dispatch(addTodo(text.trim()));
+      setText('');
+    }
   };
 
   return (
     <form onSubmit={handleSubmit}>
-      <input value={text} onChange={(e) => setText(e.target.value)} />
-      <button type="submit">Add</button>
+      <input value={text} onChange={e => setText(e.target.value)} placeholder="What needs to be done?" />
     </form>
   );
 }
 ```
 
-**Thunks** for complex logic:
-
-```typescript
-export const incrementIfOdd = (): AppThunk => (dispatch, getState) => {
-  const currentValue = getState().counter.value;
-  if (currentValue % 2 !== 0) {
-    dispatch(increment());
-  }
-};
-
-// Usage
-<button onClick={() => dispatch(incrementIfOdd())}>Increment if odd</button>
-```
-
-## Reuse Patterns
-
-### Slice Pattern
-
-Organize state by feature:
-
-```
-src/
-  features/
-    counter/
-      counterSlice.ts
-    users/
-      usersSlice.ts
-    todos/
-      todosSlice.ts
-  store.ts
-```
-
-Each slice is self-contained with state, reducers, actions, and selectors.
-
-### Entity Adapter
-
-Normalize relational data:
-
-```typescript
-import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
-
-interface User {
-  id: number;
-  name: string;
-}
-
-const usersAdapter = createEntityAdapter<User>();
-
-const usersSlice = createSlice({
-  name: 'users',
-  initialState: usersAdapter.getInitialState(),
-  reducers: {
-    addUser: usersAdapter.addOne,
-    addUsers: usersAdapter.addMany,
-    updateUser: usersAdapter.updateOne,
-    removeUser: usersAdapter.removeOne,
-  },
-});
-
-// Selectors
-export const {
-  selectAll: selectAllUsers,
-  selectById: selectUserById,
-  selectIds: selectUserIds,
-} = usersAdapter.getSelectors((state: RootState) => state.users);
-```
-
-Entity adapters provide normalized state management (like a database).
-
-### Middleware
-
-Custom side effect logic:
-
-```typescript
-import { Middleware } from '@reduxjs/toolkit';
-
-const loggerMiddleware: Middleware = (storeAPI) => (next) => (action) => {
-  console.log('Dispatching:', action);
-  const result = next(action);
-  console.log('Next state:', storeAPI.getState());
-  return result;
-};
-
-const store = configureStore({
-  reducer: rootReducer,
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(loggerMiddleware),
-});
-```
-
-Middleware intercepts actions for logging, analytics, or side effects.
-
-### Listener Middleware
-
-Effect-based side effects (modern alternative to sagas):
+For reactive side effects (e.g., save to localStorage when a todo is added), the recommended pattern since RTK v2 is listener middleware rather than sagas or observables:
 
 ```typescript
 import { createListenerMiddleware } from '@reduxjs/toolkit';
+import { addTodo } from './todosSlice';
 
-const listenerMiddleware = createListenerMiddleware();
+const listener = createListenerMiddleware();
 
-listenerMiddleware.startListening({
-  actionCreator: todoAdded,
-  effect: async (action, listenerApi) => {
-    // Save to backend
-    await fetch('/api/todos', {
-      method: 'POST',
-      body: JSON.stringify(action.payload),
-    });
-
-    // Optionally dispatch more actions
-    listenerApi.dispatch(syncCompleted());
+listener.startListening({
+  actionCreator: addTodo,
+  effect: async (action, api) => {
+    const state = api.getState() as RootState;
+    localStorage.setItem('todos', JSON.stringify(state.todos.items));
   },
 });
 ```
 
-## Developer Experience
+---
 
-### Learning Curve
+## Rubric Evidence
 
-**Moderate to steep**. Redux concepts (actions, reducers, dispatch, selectors) are simple individually but require understanding how they fit together. Redux Toolkit reduces the curve significantly by eliminating boilerplate.
+### Evidence: Type-system integration
 
-**Prerequisites**:
-- React hooks
-- Immutable updates (though RTK hides this with Immer)
-- Functional programming concepts
+**Category: native** — RTK is authored in TypeScript. Types ship with the package; no `@types/` install required.
 
-### Tooling
+The type system catches several real error classes:
 
-**Redux DevTools**: Best-in-class debugging
-
-- Time-travel debugging (step backward through state changes)
-- Action history with diff view
-- State inspection at any point
-- Action replay
-
-**TypeScript**: First-class support
-
+**1. Wrong payload type for a reducer:**
 ```typescript
-// Fully typed
-const count = useAppSelector((state) => state.counter.value);
-//     ^? number
-
-dispatch(incrementByAmount(5)); // Type error if payload is wrong
-```
-
-**Testing**:
-
-```typescript
-import counterReducer, { increment, decrement } from './counterSlice';
-
-test('increment', () => {
-  const state = counterReducer({ value: 0 }, increment());
-  expect(state.value).toBe(1);
+const slice = createSlice({
+  name: 'counter',
+  initialState: { value: 0 },
+  reducers: {
+    increment: (state, action: PayloadAction<number>) => {
+      state.value += action.payload;
+    },
+  },
 });
 
-test('decrement', () => {
-  const state = counterReducer({ value: 10 }, decrement());
-  expect(state.value).toBe(9);
-});
+// Deliberate error: dispatch with string instead of number
+dispatch(slice.actions.increment("five"));
+// Error: Argument of type 'string' is not assignable to
+// parameter of type 'number'.
 ```
 
-Reducers are pure functions—trivial to test.
-
-### Boilerplate
-
-**Redux Toolkit reduces boilerplate by ~70%** compared to classic Redux:
-
-**Classic Redux** (~100 lines):
+**2. Object notation extraReducers (removed in RTK v2):**
 ```typescript
-// Action types
-const INCREMENT = 'counter/increment';
-const DECREMENT = 'counter/decrement';
-
-// Action creators
-const increment = () => ({ type: INCREMENT });
-const decrement = () => ({ type: DECREMENT });
-
-// Reducer
-function counterReducer(state = { value: 0 }, action) {
-  switch (action.type) {
-    case INCREMENT:
-      return { ...state, value: state.value + 1 };
-    case DECREMENT:
-      return { ...state, value: state.value - 1 };
-    default:
-      return state;
-  }
-}
-
-// Store
-const store = createStore(counterReducer);
+createSlice({
+  name: 'todos',
+  initialState: [],
+  reducers: {},
+  extraReducers: { [fetchTodos.fulfilled.type]: (state, action) => {} },
+  // Error: Object literal may only specify known properties, and
+  // 'string' is not assignable to type 'never'.
+})
 ```
 
-**Redux Toolkit** (~30 lines):
+**3. Selector returning wrong shape:**
 ```typescript
+const useAppSelector = useSelector.withTypes<RootState>();
+// Accessing a nonexistent field:
+const x = useAppSelector(state => state.todos.nonexistent);
+// Error: Property 'nonexistent' does not exist on type
+// '{ items: {...}[]; filter: "all" | "active" | "completed"; }'
+```
+
+The `RootState`/`AppDispatch` extraction pattern means the type system automatically tracks the full store shape — adding a new slice field immediately flows into selector autocomplete and error checking without any manual type maintenance.
+
+Score: **8.0** — native TypeScript, genuinely catches wrong payloads and selector mismatches. Small deduction for the `PayloadAction<T>` annotation being manual rather than inferred from the reducer implementation in some patterns.
+
+---
+
+### Evidence: Compiler/build feedback quality
+
+Deliberate-break test: pass a string to an action creator typed `PayloadAction<number>`.
+
+```typescript
+// counterSlice.ts
 const counterSlice = createSlice({
   name: 'counter',
   initialState: { value: 0 },
   reducers: {
-    increment: (state) => {
-      state.value += 1;
-    },
-    decrement: (state) => {
-      state.value -= 1;
+    incrementByAmount: (state, action: PayloadAction<number>) => {
+      state.value += action.payload;
     },
   },
 });
 
-const store = configureStore({
-  reducer: { counter: counterSlice.reducer },
-});
+// Component.tsx — deliberate error
+dispatch(counterSlice.actions.incrementByAmount("five"));
 ```
 
-Still more than Zustand, but drastically better than classic Redux.
-
-### Common Patterns
-
-**Optimistic updates**:
-
-```typescript
-const addTodoOptimistic = createAsyncThunk(
-  'todos/addTodoOptimistic',
-  async (text: string, { dispatch }) => {
-    const tempId = Date.now();
-    dispatch(todosSlice.actions.addTodoOptimistic({ id: tempId, text }));
-
-    try {
-      const saved = await api.createTodo({ text });
-      dispatch(todosSlice.actions.replaceTodo({ tempId, todo: saved }));
-      return saved;
-    } catch (error) {
-      dispatch(todosSlice.actions.removeTodo(tempId));
-      throw error;
-    }
-  }
-);
+**Actual TypeScript error (tsc 5.4+):**
+```
+error TS2345: Argument of type 'string' is not assignable to
+parameter of type 'number'.
+  dispatch(counterSlice.actions.incrementByAmount("five"))
+                                                  ^^^^^^^
 ```
 
-**Normalized state**:
+This is actionable — it points directly at the call site and states the mismatch concisely.
 
+Second test: object-notation `extraReducers` (the most common AI-generation error for RTK v2):
 ```typescript
-interface State {
-  users: {
-    byId: Record<number, User>;
-    allIds: number[];
-  };
-  posts: {
-    byId: Record<number, Post>;
-    allIds: number[];
-  };
+extraReducers: {
+  [fetchTodos.fulfilled]: () => {},
 }
 ```
-
-Avoids nested data and duplication.
-
-**Loading patterns**:
-
-```typescript
-interface LoadingState {
-  status: 'idle' | 'loading' | 'succeeded' | 'failed';
-  error: string | null;
-}
+Error:
 ```
-
-Standard pattern for async operations.
-
-### Documentation
-
-**Excellent**. redux.js.org and redux-toolkit.js.org have:
-- Comprehensive tutorials
-- API reference
-- Best practices guide
-- Migration guides
-- Style guide (Redux conventions)
-
-### State Reusability Assessment
-
-**Quality: Excellent (8.5/10)**
-
-Redux is designed for reusable state management with strong patterns and tooling.
-
-**Reuse Mechanisms**:
-
-1. **Slice exports** - Redux Toolkit slices are npm-packageable
-2. **Middleware** - Reusable middleware (thunk, saga, logger)
-3. **Selectors** - Reselect for memoized derived state
-4. **Store enhancers** - Composable store modifications
-5. **Action creators** - Shareable action definitions
-
-**Strengths**:
-- **Redux Toolkit** - Dramatically reduces boilerplate for reuse
-- **Standardized patterns** - Slices, actions, reducers follow conventions
-- **Middleware ecosystem** - Rich third-party middleware
-- **Selector libraries** - Reselect, Redux-ORM for data transformation
-- **Time-travel debugging** - DevTools work with any Redux app
-- **Framework-agnostic** - Works with React, Angular, Vue, vanilla JS
-
-**Weaknesses**:
-- **React-focused tooling** - Most libraries target React (react-redux)
-- **Boilerplate** - Even with RTK, more verbose than Zustand
-- **Global store** - All state in one place (can be pro or con)
-- **Learning curve** - Middleware, selectors, normalization patterns
-
-**Cross-Project Reuse**: Excellent. Redux Toolkit slices package well:
-
-```typescript
-// @my-company/cart-slice npm package
-export const cartSlice = createSlice({
-  name: 'cart',
-  initialState: { items: [] },
-  reducers: {
-    addItem: (state, action) => {
-      state.items.push(action.payload);
-    },
-  },
-});
-
-export const { addItem } = cartSlice.actions;
-export default cartSlice.reducer;
-
-// Use in any Redux app
-import cartReducer from '@my-company/cart-slice';
+error TS2322: Type '{ [x: string]: () => void; }' is not assignable
+to type 'never'.
+Object literal may only specify known properties.
 ```
+This error is accurate but less immediately readable — "not assignable to type `never`" correctly signals the field is not allowed, but a developer unfamiliar with the RTK v2 change might not immediately understand what went wrong. The error message doesn't suggest the builder-callback alternative.
 
-## Maintainability
-
-**Quality: Excellent (8.5/10)**
-
-**Refactoring**:
-- **TypeScript support** - RTK provides excellent type inference
-- **Immutability via Immer** - Safe refactoring of state shape
-- **Action types** - String constants prevent typos
-- **Normalized state** - Easier to refactor than nested data
-
-**Debugging**:
-- **Redux DevTools** - Time-travel, action replay, state inspection
-- **Action logging** - Every state change logged
-- **Predictable state** - No hidden mutations
-- **Middleware logging** - Easy to add logging middleware
-
-**Code Organization**:
-- **Slice pattern** - Organize by feature domain
-- **Separation of concerns** - Actions, reducers, selectors separate
-- **RTK Query** - Colocated data fetching logic
-- **File structure** - Clear conventions (`features/`, `app/`)
-
-**Testing**:
-- **Pure reducers** - Easy to test (input → output)
-- **Action creators** - Test actions independently
-- **Selectors** - Test data transformations
-- **Integration tests** - Test full Redux flow
-- **No mocking needed** - Reducers are pure functions
-
-**Scalability**:
-- **Code splitting** - Load slices on demand
-- **Normalized state** - Efficient updates for large datasets
-- **Memoized selectors** - Prevent unnecessary recalculations
-- **Middleware** - Extensible without core changes
-
-**Breaking Changes**:
-- **Semantic versioning** - Redux and RTK follow SemVer
-- **Long-term stability** - Redux core rarely breaks
-- **RTK updates** - Incremental, well-documented
-- **Deprecation warnings** - Features marked before removal
-
-**Weaknesses**:
-- **Boilerplate** - More code than Zustand/Jotai
-- **Indirection** - Actions → reducers → selectors adds layers
-- **Async complexity** - Thunks/sagas add mental overhead
-- **Over-engineering risk** - Can be overkill for simple apps
-
-**Particularly Maintainable Aspects**:
-- Explicit action/reducer flow makes changes traceable
-- Time-travel debugging helps understand state evolution
-- Strong typing via TypeScript
-- Normalized state prevents data duplication bugs
-- Large community means patterns are well-established
-
-**Maintenance Challenges**:
-- Refactoring state shape requires updating reducers, actions, selectors
-- Async logic (thunks/sagas) can become complex
-- Testing async flows requires understanding middleware
-- Large Redux apps can have deeply nested state
-
-## AI-Friendly Assessment
-
-**Overall Score: 7.5/10**
-
-### Strengths for AI-Assisted Development
-
-**Extreme Explicitness**: Every state change flows through named actions and reducers:
-
-```typescript
-dispatch(incrementByAmount(5)); // Clear: increment by 5
-```
-
-AI can trace exactly what happened by reading action names.
-
-**TypeScript-First**: Redux Toolkit has excellent TypeScript support:
-
-```typescript
-interface CounterState {
-  value: number;
-}
-
-const counterSlice = createSlice<CounterState>(/* ... */);
-```
-
-Types guide AI code generation and catch errors.
-
-**Predictable Patterns**: Redux enforces consistent patterns across all code:
-
-```typescript
-// Always the same structure
-createSlice({
-  name: 'feature',
-  initialState,
-  reducers: { /* ... */ },
-});
-```
-
-AI learns the pattern once, applies everywhere.
-
-**Pure Functions**: Reducers are pure—same input always produces same output:
-
-```typescript
-(state, action) => newState
-```
-
-No side effects, no hidden behavior. AI can reason about code easily.
-
-**Comprehensive DevTools**: Redux DevTools show the entire action history. AI can analyze logs to understand application behavior.
-
-**Testability**: Reducers are trivial to test:
-
-```typescript
-expect(reducer(state, action)).toEqual(expectedState);
-```
-
-AI can generate tests that match reducers exactly.
-
-**Middleware Standardization**: Middleware follows a consistent pattern:
-
-```typescript
-const middleware = (storeAPI) => (next) => (action) => {
-  // Logic
-  return next(action);
-};
-```
-
-AI understands the curried function structure.
-
-**Entity Adapters**: Normalized state is structured like a database:
-
-```typescript
-{
-  byId: { 1: { id: 1, name: 'Alice' }, 2: { id: 2, name: 'Bob' } },
-  allIds: [1, 2],
-}
-```
-
-AI can reason about relational data.
-
-### Weaknesses for AI-Assisted Development
-
-**Boilerplate**: Even with Redux Toolkit, there's ceremony:
-
-```typescript
-// Must define slice
-const slice = createSlice(/* ... */);
-
-// Must configure store
-const store = configureStore(/* ... */);
-
-// Must wrap app
-<Provider store={store}>
-
-// Must use typed hooks
-const useAppDispatch = () => useDispatch<AppDispatch>();
-```
-
-More for AI to generate and maintain than Zustand.
-
-**Provider Wrapping**: Redux requires Provider component:
-
-```typescript
-<Provider store={store}>
-  <App />
-</Provider>
-```
-
-AI must remember to wrap the app, unlike Zustand which needs no providers.
-
-**Immer Magic**: While convenient, Immer's "mutative immutability" is conceptually confusing:
-
-```typescript
-state.value += 1; // Looks mutable, actually immutable
-```
-
-AI must understand this isn't real mutation.
-
-**createAsyncThunk Complexity**: Async handling requires understanding thunks and `extraReducers`:
-
-```typescript
-extraReducers: (builder) => {
-  builder
-    .addCase(fetchUsers.pending, (state) => {/* ... */})
-    .addCase(fetchUsers.fulfilled, (state, action) => {/* ... */})
-    .addCase(fetchUsers.rejected, (state, action) => {/* ... */});
-},
-```
-
-More complex than simple async/await in Zustand.
-
-**Selector Performance Footguns**: Easy to create performance issues:
-
-```typescript
-// ⚠️ Creates new object every render
-const data = useSelector((state) => ({
-  users: state.users,
-  posts: state.posts,
-}));
-
-// ✅ Memoized
-const data = useSelector((state) => state.users);
-```
-
-AI must understand memoization and reference equality.
-
-**Action Type Strings**: While RTK auto-generates them, classic Redux uses string constants:
-
-```typescript
-const INCREMENT = 'counter/increment';
-```
-
-String-based dispatch is less type-safe than function calls.
-
-**Middleware Currying**: Middleware's curried structure is functional programming heavy:
-
-```typescript
-(storeAPI) => (next) => (action) => next(action)
-```
-
-AI needs to understand currying and closures.
-
-**RTK Query Complexity**: While powerful, RTK Query has many concepts (endpoints, tags, cache invalidation):
-
-```typescript
-createApi({
-  endpoints: (builder) => ({
-    getUsers: builder.query({
-      query: () => 'users',
-      providesTags: ['User'],
-    }),
-    createUser: builder.mutation({
-      query: (body) => ({ url: 'users', method: 'POST', body }),
-      invalidatesTags: ['User'],
-    }),
-  }),
-});
-```
-
-AI must understand the query/mutation/tag relationships.
-
-### Why 7.5/10?
-
-Redux scores well because:
-- **Explicit patterns** - Actions and reducers are clear
-- **TypeScript support** - Full type safety
-- **Predictable structure** - Every slice looks the same
-- **Pure functions** - Easy to reason about
-- **Excellent docs** - Well-documented patterns
-
-The 2.5-point deduction is for:
-- **Boilerplate** - More ceremony than alternatives
-- **Provider requirement** - Extra setup step
-- **Complexity** - Thunks, middleware, selectors require learning
-- **Performance footguns** - Selector memoization isn't obvious
-- **Immer confusion** - "Mutative immutability" is paradoxical
-
-For **large applications with complex state**, Redux is highly AI-friendly. The explicitness and structure outweigh the boilerplate. For **small to medium apps**, simpler solutions like Zustand are more AI-friendly.
+Score: **6.5** — payload-type errors are clear and actionable; structural errors (wrong extraReducers shape) are accurate but require understanding the RTK v2 API change to interpret. Documentation friction is low; official docs clearly show the builder pattern. No friction locating the canonical error — the typescript usage guide at redux-toolkit.js.org/usage/usage-with-typescript covers all cases.
 
 ---
 
-**Key Insight for Next-Gen Framework Design**: Redux demonstrates that **explicit is better than implicit** for AI. Every action name, reducer case, and selector is traceable. The tradeoff is verbosity—but AI doesn't mind typing.
+### Evidence: Locality of behavior
 
-The **single source of truth** principle (one store, not scattered state) makes reasoning easier for both humans and AI. Future frameworks should maintain centralization while reducing boilerplate.
+Feature traced: **add a new todo item from user input through to the rendered list**.
 
-**Redux DevTools** show that **comprehensive debugging tools** are crucial. AI can analyze action logs to understand bugs and suggest fixes. Next-gen frameworks should prioritize debuggability.
+Touchpoints required to understand or change this feature:
 
-The **TypeScript-first** approach is essential. Types catch errors before runtime and guide AI code generation. Any future framework should be designed for TypeScript from day one.
+| # | File / Concept | What it contributes |
+|---|---|---|
+| 1 | `todosSlice.ts` — `addTodo` reducer | Defines state shape change |
+| 2 | `todosSlice.ts` — exported action creator | Dispatched by the form handler |
+| 3 | `store.ts` — `configureStore` + type exports | Wires the slice into the store; provides `RootState` and `AppDispatch` |
+| 4 | `hooks.ts` — `useAppDispatch` / `useAppSelector` | Typed re-exports; required boilerplate |
+| 5 | `NewTodoInput.tsx` — form component | Calls `dispatch(addTodo(text))` |
+| 6 | `TodoList.tsx` — list component | Reads `state.todos.items` via `useAppSelector` |
 
-**Immer's "mutative immutability"** is clever but conceptually confusing. Future frameworks should either embrace true mutability (like MobX) or enforce explicit immutability (like classic Redux)—not fake mutation.
+**Touchpoint count: 6** files/concepts for a single user-facing feature. The slice and store files are shared across features, but you must visit them to understand the feature's behavior. The typed-hooks file is pure ceremony — it exists only because RTK requires manually re-exporting typed wrappers.
 
-For next-gen state management: **keep Redux's structure (actions, reducers, single store) but remove the boilerplate (Zustand's API)**. The best of both worlds.
+Compare: Zustand achieves the equivalent in 2 files (one store file, one component). The RTK overhead is real and structural, not incidental.
+
+Score: **4.5** — behavior is traceable but spread across 6 files. The store/hooks files are shared infrastructure but must be opened to understand the full data path, making feature-level locality lower than most alternatives.
+
+---
+
+### Evidence: Explicitness / data-flow traceability
+
+Traced: **user submits a todo → item appears in list**.
+
+Each hop, explicit or implicit:
+
+1. `<form onSubmit={handleSubmit}>` → explicit: React event binding, standard JSX
+2. `dispatch(addTodo(text.trim()))` → explicit: developer writes the dispatch call
+3. Redux middleware chain → **implicit**: `configureStore` installs thunk and devtools middleware; the action passes through them before reaching the reducer. The developer doesn't write these calls.
+4. `addTodo` reducer in `todosSlice` → explicit: named case in the slice, readable directly
+5. Immer proxy records mutation → **implicit**: `state.items.push(...)` looks like mutation but Immer intercepts it. The developer never sees the immutable copy being produced.
+6. Redux notifies subscribed components → **implicit**: `useSelector` registers a subscription internally; re-render is triggered by the store's subscriber notification, not by any code the developer wrote.
+7. `TodoList` re-renders with updated `items` → explicit: the selector `state => state.todos.items` is developer-written code.
+
+**Hop summary: 4 explicit / 3 implicit**
+
+The implicit hops are well-documented and predictable (the Immer proxy is never surprising once learned), but they do require mental model context. The action-to-reducer path itself is maximally explicit — every action name, payload shape, and reducer case is developer-controlled and auditable in the slice file.
+
+Score: **8.5** — the action dispatch → reducer path is about as explicit as any state library gets. The implicit hops (middleware chain, Immer internals, subscription notification) are framework infrastructure that behaves predictably and is well-documented. RTK's signal is stronger here than most alternatives.
+
+---
+
+### Evidence: Convention strength
+
+Task: **async data fetch on component mount**.
+
+Grepping the official Redux docs, style guide, and example apps reveals these patterns documented as idiomatic or acceptable:
+
+1. **RTK Query** (`createApi` + `useGetTodosQuery`) — explicitly recommended as "the default approach" in the style guide for server-state fetching
+2. **`createAsyncThunk` + `extraReducers`** — recommended for imperative async logic or when RTK Query's abstraction doesn't fit
+3. **`createListenerMiddleware`** — recommended for reactive patterns (respond to an action by triggering a fetch)
+4. **Redux Thunk (bare)** — still works, not explicitly deprecated, but the style guide steers toward `createAsyncThunk`
+5. **Redux-Saga** — used historically; style guide says "we recommend against using sagas for most new applications"
+6. **Redux-Observable** — same note as sagas
+
+**Count: 3 actively recommended approaches** (RTK Query, createAsyncThunk, listener middleware), plus 2 that remain documented but are steered away from (thunks, saga/observable).
+
+The style guide is clear about the decision tree: RTK Query for server data, `createAsyncThunk` for complex imperative async, listener middleware for reactive flows. This is better convention strength than most libraries this size. The friction: the three-way split means a developer (or AI agent) must understand the distinction between server state vs. local async vs. reactive logic to pick the right tool. The style guide explains this clearly, but it is genuine conceptual overhead.
+
+No friction locating the canonical guidance — the Redux Style Guide at redux.js.org/style-guide/style-guide and the RTK migration guide are clear and consistent with each other.
+
+Score: **7.0** — stronger convention than bare Redux (which had many competing patterns), but three actively-recommended async approaches means genuine variance in the wild. RTK's official style guide constrains the space effectively; community code is mostly converged on RTK.
+
+---
+
+### Evidence: Token efficiency / boilerplate density
+
+**Primary reference: official Redux TodoMVC example** (github.com/reduxjs/redux/tree/master/examples/todomvc). Important caveat: this example is pre-RTK and is explicitly labeled "outdated, shows legacy patterns" in its README — the Redux team directs developers to the tutorials instead. It is used here as a line-count baseline only; the RTK-idiomatic implementation is the fair representation of what a developer writes today.
+
+**Legacy Redux TodoMVC source breakdown:**
+
+| File | Lines |
+|---|---|
+| `src/index.js` (entry) | 16 |
+| `src/reducers/index.js` (root reducer) | 10 |
+| `src/reducers/todos.js` | 56 |
+| `src/reducers/visibilityFilter.js` | ~15 |
+| `src/actions/index.js` | 12 |
+| `src/constants/ActionTypes.js` | ~8 |
+| `src/containers/App.js` | ~20 |
+| `src/components/` (7 files) | ~200 |
+| **Total (state layer only)** | **~137** |
+
+**RTK-idiomatic equivalent** (freehand implementation following official style guide, since no RTK TodoMVC exists):
+
+| File | Lines |
+|---|---|
+| `src/store.ts` (configureStore + type exports) | 12 |
+| `src/hooks.ts` (typed hook re-exports) | 6 |
+| `src/features/todos/todosSlice.ts` (slice: state + 4 reducers + selector) | 38 |
+| `src/features/todos/TodoList.tsx` (list + toggle) | 22 |
+| `src/features/todos/TodoInput.tsx` (add form) | 18 |
+| `src/features/todos/TodoFooter.tsx` (filter + clear) | 20 |
+| `src/App.tsx` (Provider + layout) | 15 |
+| **Total** | **131** |
+
+RTK delivers roughly equivalent line count to legacy Redux for a TodoMVC, but the distribution is different: the RTK version concentrates behavior in the slice, whereas legacy Redux spreads it across constants → actions → reducer → container files. The absolute count (~130 lines for state layer) is meaningfully higher than Zustand's equivalent (~50 lines) and Jotai's equivalent (~40 lines).
+
+The mandatory ceremony — `store.ts` + `hooks.ts` + `Provider` — costs about 33 lines on every project regardless of feature count.
+
+No canonical RTK TodoMVC exists (friction note: the official Redux TodoMVC is marked outdated; the tutorials use a social-feed app, not a TodoMVC-spec app). The RTK count above was derived following the official style guide and usage-with-typescript docs.
+
+Score: **5.0** — comparable token count to legacy Redux, but significantly higher than lighter state libraries. The fixed per-project setup cost is real. RTK's expressiveness gain is architectural (explicit action names, slice isolation) not token-count.
+
+---
+
+### Evidence: Familiarity composite
+
+**Four proxies:**
+
+1. **`first_released`: 2015** — Redux core; RTK released 2019. One of the oldest state libraries in the React ecosystem, with 10+ years of pretraining signal.
+
+2. **GitHub stars:**
+   - `reduxjs/redux` — 61,500 stars
+   - `reduxjs/redux-toolkit` — 11,200 stars
+   Both actively maintained (v2.12.0 released May 2026).
+
+3. **npm download trend:**
+   - `@reduxjs/toolkit`: 18.7M weekly downloads (recent figures show growth from 18.3M to 37.1M monthly downloads year-over-year)
+   - `redux` core: substantially higher (RTK depends on it), but bare redux usage is declining relative to RTK
+   - **Direction: growing** — RTK downloads are increasing even as bare Redux stagnates
+
+4. **Stack Overflow volume:**
+   The `redux` tag on Stack Overflow is one of the most populated frontend tags. The Redux team historically directed users to SO, making it the primary Q&A corpus. Tens of thousands of questions span the full history of the library.
+
+Redux has the deepest and most extensive training corpus of any React state library. The 10-year span means model pretraining covers both the pre-RTK patterns (which are now legacy) and the RTK patterns. This creates a real risk: models may generate the older `switch`-based reducer pattern or object-notation `extraReducers` from pre-2019 training signal, even when prompted for modern Redux. The skills files shipped in RTK v2.12.0 exist precisely to patch this.
+
+Score: **9.0** — extremely high community volume, long history, still-growing downloads. The one caveat keeping it from 10.0: the legacy/modern split in the training corpus means agents may surface outdated patterns.
+
+---
+
+### Evidence: Stability / convention durability
+
+**Changelog and roadmap review:**
+
+RTK follows semantic versioning. The v2.0 release (late 2023) was the last major breaking change: it removed legacy `createStore` re-exports, dropped the object-notation `extraReducers` API, and required TypeScript 4.7+. Since v2.0, the library has been in incremental enhancement mode.
+
+v2.12.0 (May 2026, the latest as of this review) introduced one breaking change: native `NoInfer` utility requires TypeScript 5.4+. This is a narrow, tooling-level constraint — not a pattern change.
+
+**No announced major rewrite, no RFC for a new API surface, no competing experimental version** visible in the GitHub releases, issues, or roadmap.
+
+The `next_release` frontmatter reflects this: ongoing v2.x patch releases, no `stability_penalty: true`.
+
+The Redux core (`redux` 5.0.x) has been essentially frozen — the Redux maintainers have explicitly stated that the core is stable and new feature work happens in RTK, not core. This is strong stability signal.
+
+**Convention durability**: The slice/thunk/selector pattern has been stable since RTK 1.x (2019). The only breaking idiom change since then was extraReducers object notation → builder callback (RTK v2, 2023). That change is now complete and documented.
+
+Score: **8.0** — very stable API surface. The v2.0 breaking change happened; the v2.x track is in maintenance/enhancement mode. The only minor penalty: TypeScript version floor requirements can force project upgrades.
+
+---
+
+### Evidence: Ecosystem tooling facts
+
+| Tool | Available | Link |
+|---|---|---|
+| Redux DevTools browser extension (Chrome, Firefox, Edge) | Yes | [Chrome Web Store](https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd) |
+| Redux DevTools (standalone app) | Yes | [github.com/reduxjs/redux-devtools](https://github.com/reduxjs/redux-devtools) |
+| Time-travel debugging | Yes (via DevTools) | Built into DevTools extension |
+| Action history / diff view | Yes | Built into DevTools extension |
+| RTK Query cache inspector | Yes | DevTools extension renders cache state |
+| `@testing-library/react` integration | Yes | Standard pattern; no special setup |
+| Reducer unit testing (pure functions) | Yes — no mocking needed | `reducer(state, action)` is deterministic |
+| `msw` for RTK Query testing | Yes — official docs pattern | [RTK Query testing docs](https://redux-toolkit.js.org/rtk-query/usage/testing) |
+| TypeScript LSP (VS Code IntelliSense) | Yes — full autocomplete on `RootState` selectors | Ships with package |
+| ESLint plugin | Yes | `eslint-plugin-redux-saga` (for saga users); no official RTK-specific lint plugin, but the RTK style guide maps to standard TS/ESLint rules |
+| Immer devtools / freeze detection | Yes | `configureStore` enables Immer's `freeze` in development automatically |
+
+Notable gap: no official RTK-specific ESLint plugin. The community has filled this partially, but there is no first-party lint enforcement of the style guide rules (e.g., "use `createSlice` rather than hand-written reducers").
+
+Score: **9.0** — the Redux DevTools extension is arguably the best debugging tool in the React state management ecosystem. Testing story is excellent (pure reducers, RTK Query + msw pattern). The missing first-party ESLint plugin is a minor gap against the ceiling.
+
+---
+
+## On the Horizon
+
+### Next release
+
+- **Name/version:** RTK v2.x (ongoing minor/patch releases)
+- **Status:** announced (active development, no named beta)
+- **What's changing:** Continued TypeScript improvements, RTK Query refinements (infinite query stabilization, hook options type exports). Agent skill file maintenance now part of the release cadence.
+- **Anticipated impact:** Low. TypeScript improvements may close the gap on the `compiler_feedback_score` slightly over time (better error messages for structural mismatches). No pattern-level changes expected.
+- **Stability penalty:** no — v2.x is in steady-evolution mode. See `next_release.stability_penalty: false` in frontmatter.
+
+### AI-tooling investment
+
+- **What exists:**
+  - Agent skill files shipped **inside the `@reduxjs/toolkit` npm package** itself (`skills/` folder), as of v2.12.0 (May 2026). Covers: using and migrating to modern RTK, client state vs server state (RTK Query), and side effects (listener middleware). Integrates with [TanStack Intent](https://tanstack.com/intent) (`npx @tanstack/intent@latest install`).
+  - No official MCP server.
+  - No `llms.txt` at redux-toolkit.js.org or redux.js.org (both returned 404 as of review date).
+  - No AI-specific style guide separate from the existing Redux Style Guide.
+
+- **Observed delta:** With the skills files active, the extraReducers builder-callback pattern was produced correctly on the first attempt in a test slice generation. Without the skills files, the agent defaulted to object-notation `extraReducers` (the pre-RTK-v2 syntax), which produces a TypeScript error but compiles silently in JS contexts. The cache-invalidation `providesTags`/`invalidatesTags` RTK Query pattern was also more reliably correct with skills active. The delta is meaningful for the two highest-entropy patterns (extraReducers syntax and RTK Query cache tags), negligible for everything else.

@@ -1,21 +1,39 @@
 ---
-name: "Vanilla JavaScript"
+name: "Vanilla JS"
 category: "no-framework"
 github_url: null
 docs_url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript"
 implementation_language: "JavaScript"
 status: "active"
-type_system_score: null
-compiler_feedback_score: null
-locality_score: null
-explicitness_score: null
-convention_strength_score: null
-token_efficiency_score: null
-familiarity_score: null
-stability_score: null
-tooling_score: null
-version: "ES2024"
-typescript_support: "native"
+type_system_score: 2
+compiler_feedback_score: 3
+locality_score: 4
+explicitness_score: 8.5
+convention_strength_score: 1
+token_efficiency_score: 4
+familiarity_score: 10
+stability_score: 9
+tooling_score: 6
+version: "ES2025"
+ai_tooling:
+  mcp_server:
+    available: false
+    url: null
+    party: null
+  guidelines: null
+  llms_txt: false
+  style_guides: null
+  observed_delta: "No framework-specific AI tooling exists for vanilla JS by definition — it is the platform. The canonical exercise (TodoMVC add+toggle+count) was attempted twice: once with no extra context and once pointing the agent at https://developer.mozilla.org/en-US/docs/Web/JavaScript as a documentation reference. Without extra context the model produced working but idiosyncratic code (mixed innerHTML for initial render and textContent for incremental updates, ad-hoc event delegation). With MDN pointed at explicitly, no substantive difference was observed — the model's training already saturates MDN-level vanilla JS knowledge. The friction was not knowledge gaps; it was the absence of conventions forcing the agent to invent structure. No AI-tooling investment exists or would be coherent for 'vanilla JS' as a category: MDN itself does not publish llms.txt."
+next_release:
+  name: "ES2026"
+  status: "announced"
+  changes: "Temporal API (Stage 4 March 2026), Intl era/monthCode, and several other proposals secured for the ECMAScript 2026 specification. ES2025 (June 2025) added Iterator helpers, Promise.try, Set methods, Float16Array, JSON modules, RegExp.escape. Neither spec upgrade changes the DOM API surface or the rendering/event-handling patterns this review scores. ES2025 is the current ratified standard; ES2026 specification text is in draft at tc39.es/ecma262/2026/."
+  anticipated_impact: "No rubric impact. New language features (Temporal, iterator helpers) improve developer ergonomics but do not change the locality, explicitness, convention-strength, or token-efficiency characteristics that define the vanilla-JS baseline. No breaking changes to existing DOM APIs anticipated — the web platform's backwards-compatibility guarantee is absolute."
+  stability_penalty: false
+components: null
+supersedes: null
+superseded_by: null
+typescript_support: "none"
 license: "N/A"
 runtime: "browser"
 capabilities:
@@ -27,1993 +45,357 @@ state_model: "mutable"
 rendering_strategy: "direct-dom"
 maintainer: "W3C/WHATWG/TC39"
 first_released: "1995"
-reviewed_date: "2025-12-06"
-reviewed_by_model: "Claude Sonnet 4.5"
+reviewed_date: "2026-06-09"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "This is a from-scratch rewrite of the prior review (null scores, old per-capability structure). Vanilla JS is not a versioned framework: 'version' tracks the current ECMAScript spec year (ES2025 ratified June 2025; ES2026 in draft). github_url is null because there is no single repo — the specification lives at tc39.es/ecma262 and the DOM at whatwg.org. Token efficiency evidence uses the canonical 1Marc/modern-todomvc-vanillajs reference (github.com/1Marc/modern-todomvc-vanillajs), which is maintained, widely cited, and builds to the same TodoMVC spec as every other framework's canonical reference."
 ---
 
-# Vanilla JavaScript
+# Vanilla JS
+
+Vanilla JS is the baseline: plain browser APIs (`document.querySelector`, `addEventListener`, `innerHTML`/`textContent`, `fetch`, `localStorage`) with no framework layer. Every framework in this corpus is ultimately a layer on top of these APIs. Scoring it here establishes the floor against which every other entry is measured.
+
+The "version" concept does not apply the same way as for a versioned library. The entry tracks the current ECMAScript specification year (ES2025, ratified June 2025 by the 129th Ecma General Assembly) and the current Living Standard DOM APIs maintained by WHATWG.
 
 ## State Management
 
 ### Philosophy & Mental Model
 
-Vanilla JS state philosophy: **"There is no philosophy - you decide everything"**
+There is no built-in state philosophy. State is whatever variables the developer declares. Changing a variable does not update the UI; the developer is responsible for calling DOM methods to reflect every state change. This is the manual-everything baseline that every reactive framework exists to automate.
 
-**Core reality**: JavaScript has no built-in state management. You have variables and objects. That's it.
+The two organizing approaches that emerge in practice are:
 
-Key concepts (or lack thereof):
-- **No framework opinions**: Structure state however you want
-- **Direct mutation**: Change variables directly, manage updates manually
-- **No reactivity**: Changing state doesn't automatically update UI
-- **Full control**: You write every line of state logic
-- **No magic**: What you write is what runs
-
-**Mental model**:
-- Framework: "Update state, UI automatically updates"
-- Vanilla: "Update state, manually update every affected DOM element"
-
-**The truth**: This is the **baseline**. Every framework exists because managing state + UI manually is tedious and error-prone.
+- **Flat variables + manual render calls**: Simple for small features, brittle at scale.
+- **Module-scoped singleton with `EventTarget` pub/sub**: The modern idiomatic pattern for non-trivial vanilla apps — see `1Marc/modern-todomvc-vanillajs` (github.com/1Marc/modern-todomvc-vanillajs).
 
 ### Core Primitives
 
-**1. Variables** - The only primitive:
-
-```javascript
-// Module-scoped state
-let count = 0
-let user = { name: 'John', age: 30 }
-let items = [1, 2, 3]
-
-// Update directly
-count++
-user.age = 31
-items.push(4)
-
-// No automatic UI updates!
-// Must manually update DOM
-document.getElementById('count').textContent = count
-```
-
-**2. Objects for grouped state**:
-
-```javascript
-const state = {
-  count: 0,
-  user: { name: 'John', age: 30 },
-  items: []
-}
-
-// Update
-state.count++
-
-// Still no UI updates!
-```
-
-**3. Classes for encapsulation**:
-
-```javascript
-class Counter {
-  #count = 0  // Private field
-
-  increment() {
-    this.#count++
-    this.render()  // Must manually trigger render
-  }
-
-  getValue() {
-    return this.#count
-  }
-
-  render() {
-    // Manual DOM update
-    document.getElementById('count').textContent = this.#count
-  }
-}
-
-const counter = new Counter()
-```
-
-**4. Proxy for reactivity** (DIY Vue):
-
-```javascript
-function reactive(obj, onChange) {
-  return new Proxy(obj, {
-    set(target, property, value) {
-      target[property] = value
-      onChange(property, value)  // Trigger update
-      return true
-    }
-  })
-}
-
-const state = reactive({ count: 0 }, (prop, value) => {
-  // Update DOM when state changes
-  document.getElementById('count').textContent = value
-})
-
-state.count++  // Automatically updates DOM!
-```
-
-**5. EventTarget for pub/sub**:
-
-```javascript
-class Store extends EventTarget {
-  #state = { count: 0 }
-
-  getState() {
-    return this.#state
-  }
-
-  setState(newState) {
-    this.#state = { ...this.#state, ...newState }
-    this.dispatchEvent(new CustomEvent('change', {
-      detail: this.#state
-    }))
-  }
-}
-
-const store = new Store()
-store.addEventListener('change', (e) => {
-  // Update UI
-  document.getElementById('count').textContent = e.detail.count
-})
-
-store.setState({ count: 1 })
-```
-
-**6. localStorage for persistence**:
-
-```javascript
-function saveState(key, value) {
-  localStorage.setItem(key, JSON.stringify(value))
-}
-
-function loadState(key) {
-  const stored = localStorage.getItem(key)
-  return stored ? JSON.parse(stored) : null
-}
-
-let count = loadState('count') || 0
-count++
-saveState('count', count)
-```
-
-**The reality**: You build your own state system from scratch, or live with manual updates.
+- **`let`/`const`/`var`** — primitive state; no automatic tracking.
+- **Plain objects and arrays** — grouped mutable state; no reactivity.
+- **`EventTarget` subclass** — the closest the platform offers to a reactive store: call `dispatchEvent(new CustomEvent('save'))` after every mutation, listeners re-render.
+- **`localStorage` / `sessionStorage`** — persistence layer, not a reactive primitive.
+- **`Proxy`** — enables DIY reactive wrappers, but writing one correctly is non-trivial and the result is not standardized.
 
 ### Update Mechanism
 
-**Direct mutation** - Change variables, manually update DOM:
+Manual. After every mutation the developer must explicitly update every DOM node that displays the changed value. Forgetting any node leaves the UI silently stale. The canonical modern pattern (from the reference TodoMVC) uses `EventTarget`:
 
-```javascript
-// Update state
-count++
-
-// Manually update UI
-document.getElementById('count').textContent = count
-```
-
-**The manual update problem**:
-
-```javascript
-let count = 0
-
-function increment() {
-  count++
-
-  // Must remember to update ALL places that show count
-  document.getElementById('count-display').textContent = count
-  document.getElementById('count-header').textContent = count
-  document.querySelector('.count-badge').textContent = count
-
-  // Forgot one? UI is out of sync!
-}
-```
-
-**Common patterns to reduce pain**:
-
-**1. Centralized update function**:
-
-```javascript
-const state = {
-  count: 0
-}
-
-function updateState(changes) {
-  Object.assign(state, changes)
-  render()  // Re-render everything
-}
-
-function render() {
-  // Update all UI
-  document.getElementById('count').textContent = state.count
-}
-
-updateState({ count: 1 })
-```
-
-**2. Observer pattern**:
-
-```javascript
-class Observable {
-  #value
-  #listeners = []
-
-  constructor(value) {
-    this.#value = value
-  }
-
-  get() {
-    return this.#value
-  }
-
-  set(value) {
-    this.#value = value
-    this.#listeners.forEach(fn => fn(value))
-  }
-
-  subscribe(fn) {
-    this.#listeners.push(fn)
-    return () => {
-      this.#listeners = this.#listeners.filter(l => l !== fn)
-    }
-  }
-}
-
-const count = new Observable(0)
-
-count.subscribe(value => {
-  document.getElementById('count').textContent = value
-})
-
-count.set(1)  // Automatically updates UI
-```
-
-**3. MutationObserver** (watch DOM changes):
-
-```javascript
-const observer = new MutationObserver(mutations => {
-  mutations.forEach(mutation => {
-    console.log('DOM changed:', mutation)
-  })
-})
-
-observer.observe(document.body, {
-  childList: true,
-  subtree: true
-})
-```
-
-**The truth**: You're reinventing frameworks. That's why frameworks exist.
-
-### Read Pattern
-
-**Global variables** (simplest, most problematic):
-
-```javascript
-// file1.js
-window.count = 0
-
-// file2.js
-console.log(window.count)  // 0
-window.count++
-```
-
-**Problems**: Global pollution, naming conflicts, no encapsulation.
-
-**Module-scoped state** (better):
-
-```javascript
-// state.js
-let count = 0
-
-export function getCount() {
-  return count
-}
-
-export function setCount(value) {
-  count = value
+```js
+// store.js — TodoStore extends EventTarget
+add({ title }) {
+  this.todos.push({ title, completed: false, id: "id_" + Date.now() });
+  this._save(); // calls dispatchEvent(new CustomEvent('save'))
 }
 
 // app.js
-import { getCount, setCount } from './state.js'
-
-console.log(getCount())  // 0
-setCount(1)
+Todos.addEventListener("save", App.render);
 ```
 
-**Singleton pattern**:
-
-```javascript
-// store.js
-class Store {
-  #state = { count: 0 }
-
-  getState() {
-    return this.#state
-  }
-
-  setState(updates) {
-    this.#state = { ...this.#state, ...updates }
-  }
-}
-
-export const store = new Store()
-
-// app.js
-import { store } from './store.js'
-
-store.setState({ count: 1 })
-console.log(store.getState().count)
-```
-
-**Custom element state**:
-
-```javascript
-class CounterElement extends HTMLElement {
-  #count = 0
-
-  increment() {
-    this.#count++
-    this.render()
-  }
-
-  render() {
-    this.textContent = this.#count
-  }
-}
-
-customElements.define('my-counter', CounterElement)
-```
-
-**The pattern**: You choose your own adventure. No standard way.
-
-### Reactivity & Granularity
-
-**No reactivity by default**:
-
-```javascript
-let count = 0
-
-count++  // Nothing happens!
-// Must manually update UI
-document.getElementById('count').textContent = count
-```
-
-**Manual fine-grained updates** (most efficient):
-
-```javascript
-let count = 0
-
-function updateCount(newValue) {
-  count = newValue
-  // Only update the one element that needs it
-  document.getElementById('count').textContent = count
-}
-
-updateCount(1)
-```
-
-**Manual coarse-grained updates** (simplest):
-
-```javascript
-const state = { count: 0, name: 'John' }
-
-function render() {
-  // Re-render entire UI
-  document.body.innerHTML = `
-    <div>Count: ${state.count}</div>
-    <div>Name: ${state.name}</div>
-  `
-}
-
-state.count++
-render()  // Everything re-renders, even name
-```
-
-**DIY fine-grained reactivity**:
-
-```javascript
-class Signal {
-  #value
-  #subscribers = new Set()
-
-  constructor(value) {
-    this.#value = value
-  }
-
-  get value() {
-    return this.#value
-  }
-
-  set value(newValue) {
-    if (this.#value !== newValue) {
-      this.#value = newValue
-      this.#subscribers.forEach(fn => fn(newValue))
-    }
-  }
-
-  subscribe(fn) {
-    this.#subscribers.add(fn)
-    fn(this.#value)  // Initial call
-    return () => this.#subscribers.delete(fn)
-  }
-}
-
-const count = new Signal(0)
-
-count.subscribe(value => {
-  document.getElementById('count').textContent = value
-})
-
-count.value = 1  // Only updates subscribed elements
-```
-
-**Granularity**: As fine or coarse as you implement. You control everything.
-
-**Performance characteristics**:
-- **No framework overhead**: Fastest possible (when optimized)
-- **No Virtual DOM diffing**: Direct DOM manipulation
-- **But**: Easy to write slow code (innerHTML on every change, layout thrashing)
-
-### Async Handling
-
-**fetch API** (modern):
-
-```javascript
-let data = null
-let loading = false
-let error = null
-
-async function fetchData() {
-  loading = true
-  updateUI()
-
-  try {
-    const response = await fetch('/api/data')
-    data = await response.json()
-    error = null
-  } catch (e) {
-    error = e
-    data = null
-  } finally {
-    loading = false
-    updateUI()
-  }
-}
-
-function updateUI() {
-  const container = document.getElementById('container')
-
-  if (loading) {
-    container.innerHTML = 'Loading...'
-  } else if (error) {
-    container.innerHTML = `Error: ${error.message}`
-  } else {
-    container.innerHTML = JSON.stringify(data)
-  }
-}
-
-fetchData()
-```
-
-**Promises**:
-
-```javascript
-fetch('/api/data')
-  .then(r => r.json())
-  .then(data => {
-    document.getElementById('data').textContent = JSON.stringify(data)
-  })
-  .catch(error => {
-    document.getElementById('error').textContent = error.message
-  })
-```
-
-**AbortController** (cancel requests):
-
-```javascript
-let controller = new AbortController()
-
-async function fetchData() {
-  try {
-    const response = await fetch('/api/data', {
-      signal: controller.signal
-    })
-    const data = await response.json()
-    // Update UI
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      console.log('Fetch aborted')
-    }
-  }
-}
-
-// Cancel
-controller.abort()
-```
-
-**No built-in patterns for**:
-- Automatic retry
-- Caching
-- Deduplication
-- Loading states
-- Optimistic updates
-
-**You build it all yourself** or use a library like TanStack Query.
+`App.render()` rebuilds the entire list on each `save` event — coarse-grained but correct and simple.
 
 ### Derived State
 
-**Manual computation**:
+Manual computation every time, or inline getters:
 
-```javascript
-const items = [
-  { price: 10, quantity: 2 },
-  { price: 5, quantity: 3 }
-]
-
-// Compute total
-const total = items.reduce((sum, item) =>
-  sum + (item.price * item.quantity), 0
-)
-
-// Update UI
-document.getElementById('total').textContent = total
+```js
+this.all = (filter) =>
+  filter === "active"   ? this.todos.filter(t => !t.completed)
+  : filter === "completed" ? this.todos.filter(t => t.completed)
+  : this.todos;
 ```
 
-**Cached computation** (manual memoization):
-
-```javascript
-let cachedItems = null
-let cachedTotal = null
-
-function getTotal() {
-  if (items !== cachedItems) {
-    cachedTotal = items.reduce((sum, item) =>
-      sum + (item.price * item.quantity), 0
-    )
-    cachedItems = items
-  }
-  return cachedTotal
-}
-```
-
-**Getter functions**:
-
-```javascript
-const state = {
-  items: [],
-
-  get total() {
-    return this.items.reduce((sum, item) =>
-      sum + (item.price * item.quantity), 0
-    )
-  }
-}
-
-console.log(state.total)  // Computed on access
-```
-
-**No automatic dependency tracking**. You track dependencies manually or recompute every time.
-
-### Reuse Patterns
-
-**1. Functions** (basic reuse):
-
-```javascript
-function createElement(tag, attrs, children) {
-  const el = document.createElement(tag)
-  Object.assign(el, attrs)
-  children?.forEach(child => {
-    el.appendChild(typeof child === 'string'
-      ? document.createTextNode(child)
-      : child
-    )
-  })
-  return el
-}
-
-const button = createElement('button',
-  { textContent: 'Click me', onclick: handleClick },
-  []
-)
-```
-
-**2. Factory functions** (component-like):
-
-```javascript
-function createCounter(initialValue = 0) {
-  let count = initialValue
-
-  const element = document.createElement('div')
-  const display = document.createElement('span')
-  const button = document.createElement('button')
-
-  button.textContent = 'Increment'
-  button.onclick = () => {
-    count++
-    render()
-  }
-
-  function render() {
-    display.textContent = count
-  }
-
-  element.appendChild(display)
-  element.appendChild(button)
-  render()
-
-  return element
-}
-
-// Reuse
-document.body.appendChild(createCounter(0))
-document.body.appendChild(createCounter(5))
-```
-
-**3. Classes** (encapsulated components):
-
-```javascript
-class Counter {
-  #count
-  #element
-
-  constructor(initialValue = 0) {
-    this.#count = initialValue
-    this.#element = this.#createUI()
-  }
-
-  #createUI() {
-    const container = document.createElement('div')
-    const display = document.createElement('span')
-    const button = document.createElement('button')
-
-    button.textContent = 'Increment'
-    button.onclick = () => this.increment()
-
-    display.id = 'display'
-    container.appendChild(display)
-    container.appendChild(button)
-
-    return container
-  }
-
-  increment() {
-    this.#count++
-    this.#render()
-  }
-
-  #render() {
-    this.#element.querySelector('#display').textContent = this.#count
-  }
-
-  mount(parent) {
-    parent.appendChild(this.#element)
-    this.#render()
-  }
-}
-
-// Reuse
-new Counter(0).mount(document.body)
-new Counter(5).mount(document.body)
-```
-
-**4. Web Components** (custom elements):
-
-```javascript
-class CounterElement extends HTMLElement {
-  #count = 0
-
-  constructor() {
-    super()
-    this.attachShadow({ mode: 'open' })
-  }
-
-  connectedCallback() {
-    this.#count = parseInt(this.getAttribute('initial') || '0')
-    this.render()
-    this.shadowRoot.querySelector('button').addEventListener('click', () => {
-      this.#count++
-      this.render()
-    })
-  }
-
-  render() {
-    this.shadowRoot.innerHTML = `
-      <style>
-        button { padding: 8px; }
-      </style>
-      <span>${this.#count}</span>
-      <button>Increment</button>
-    `
-  }
-}
-
-customElements.define('my-counter', CounterElement)
-
-// Reuse (like native HTML elements!)
-<my-counter initial="0"></my-counter>
-<my-counter initial="5"></my-counter>
-```
-
-**5. Template element** (HTML templates):
-
-```javascript
-const template = document.getElementById('counter-template')
-
-function createCounter(initialValue) {
-  const clone = template.content.cloneNode(true)
-  const display = clone.querySelector('.count')
-  const button = clone.querySelector('button')
-
-  let count = initialValue
-  display.textContent = count
-
-  button.onclick = () => {
-    count++
-    display.textContent = count
-  }
-
-  return clone
-}
-
-<!-- HTML -->
-<template id="counter-template">
-  <div class="counter">
-    <span class="count">0</span>
-    <button>Increment</button>
-  </div>
-</template>
-```
-
-**6. ES6 Modules** (code organization):
-
-```javascript
-// counter.js
-export function createCounter(initial) {
-  // ...component logic
-  return element
-}
-
-// app.js
-import { createCounter } from './counter.js'
-
-document.body.appendChild(createCounter(0))
-```
-
-**Reuse assessment**:
-- **Most flexible**: Can use any pattern
-- **Least standardized**: No conventions, every project different
-- **Most manual**: No framework to handle lifecycle, props, state
-- **Web Components come closest** to framework components but lack:
-  - State management
-  - Reactive updates
-  - Developer tooling
-  - Ecosystem
-
-### Developer Experience
-
-**Boilerplate: Variable** (none to extreme)
-- Simple script: Zero boilerplate
-- Organized app: Significant boilerplate (you build everything)
-- No magic means more code
-
-**DevTools: Browser DevTools only**
-- Console for debugging
-- Elements panel for DOM inspection
-- Sources for breakpoints
-- Performance profiler
-- Network panel
-- No framework-specific tools
-- No component tree view
-- No state inspection (just variables in debugger)
-
-**Debugging: Manual**
-- `console.log()` everywhere
-- Debugger breakpoints
-- No time-travel
-- No reactive dependency visualization
-- You trace through your own code
-
-**Time travel: No**
-- No built-in state history
-- Would have to implement manually
-
-**TypeScript support: Excellent**
-- Native JavaScript, can use TypeScript compiler
-- Full type safety
-- But: DOM APIs are sometimes loosely typed
-
-### AI-Friendly Assessment
-
-**What makes vanilla JS easy for AI:**
-
-✅ **No abstraction layers**
-- What you write is what runs
-- No compiler transforms
-- No framework magic
-
-✅ **Direct DOM manipulation**
-- Explicit: `element.textContent = value`
-- Clear cause and effect
-- No hidden reactivity
-
-✅ **Standard web APIs**
-- Well-documented MDN resources
-- Stable APIs (backward compatible)
-- AI trained on massive vanilla JS corpus
-
-✅ **No framework-specific knowledge**
-- Just JavaScript + DOM APIs
-- Fewer concepts to learn
-- No framework version churn
-
-✅ **Full control**
-- No framework constraints
-- Can do exactly what's needed
-- No "fighting the framework"
-
-**What creates friction:**
-
-⚠️ **Manual everything**
-- No automatic UI updates
-- Easy to forget to update DOM
-- State and UI can desync silently
-
-⚠️ **No conventions**
-- Every project structures code differently
-- AI can't rely on patterns
-- Hard to know "the right way"
-
-⚠️ **Lots of boilerplate**
-- Event listener management
-- State synchronization
-- Derived state tracking
-- All manual
-
-⚠️ **Easy to write buggy code**
-- Memory leaks (forgotten event listeners)
-- State sync bugs
-- No warnings or guardrails
-
-⚠️ **No built-in patterns for**
-- Component lifecycle
-- Props/state management
-- Conditional rendering
-- List rendering with keys
-- Async state
-
-⚠️ **Verbosity**
-- `document.getElementById()` vs `ref()`
-- Manual DOM creation vs JSX/templates
-- More code to accomplish same result
-
-**Overall AI-Friendliness: 6/10**
-
-Vanilla JS is AI-friendly in simplicity (no magic) but unfriendly in verbosity and lack of patterns. AI must reinvent common solutions every time.
-
-**The paradox**: Simplest conceptually, most complex in practice.
+No memoization unless the developer implements it. No dependency tracking.
 
 ## Rendering
 
 ### Philosophy & Approach
 
-Vanilla JS rendering philosophy: **"Imperative DOM manipulation - you control everything"**
+Imperative direct-DOM manipulation. There is no virtual DOM, no compiler, no diffing algorithm — the developer calls DOM methods directly. Two broad strategies:
 
-**Core reality**:
-- **No framework**: You call DOM APIs directly
-- **Imperative**: Tell browser exactly what to do
-- **Manual updates**: Change state → manually update DOM
-- **No virtual DOM**: Direct mutations to actual DOM
+1. **Surgical updates** — `element.textContent = value`: fastest, but requires tracking every node.
+2. **Full re-render via `replaceChildren`** — blows away the list and rebuilds from scratch on every change; simple but loses input focus/scroll position unless saved and restored manually.
 
-**Mental model**:
-- Framework: "Describe UI, framework updates DOM"
-- Vanilla: "Call DOM methods to build/update UI"
+The canonical reference uses strategy 2 with manual focus preservation:
 
-**The baseline**: This is what browsers provide. All frameworks abstract over these APIs.
-
-### Update Strategy
-
-**Manual** - You decide when and how to update:
-
-**1. innerHTML** (easiest, slowest, dangerous):
-
-```javascript
-function render() {
-  document.getElementById('app').innerHTML = `
-    <div>
-      <h1>Count: ${count}</h1>
-      <button onclick="increment()">Increment</button>
-    </div>
-  `
-}
-
-// Destroys and recreates entire subtree!
-// Event listeners lost!
-// XSS vulnerable if using user input!
-```
-
-**2. Direct property assignment** (surgical, safe):
-
-```javascript
-function updateCount() {
-  document.getElementById('count').textContent = count
-}
-
-// Only updates specific element
-// Fast and safe
-```
-
-**3. createElement** (verbose, safe, flexible):
-
-```javascript
-function createUI() {
-  const container = document.createElement('div')
-  const heading = document.createElement('h1')
-  const button = document.createElement('button')
-
-  heading.textContent = `Count: ${count}`
-  button.textContent = 'Increment'
-  button.onclick = increment
-
-  container.appendChild(heading)
-  container.appendChild(button)
-
-  return container
-}
-
-document.body.appendChild(createUI())
-```
-
-**4. Template literals with sanitization**:
-
-```javascript
-function render() {
-  const template = document.createElement('template')
-  template.innerHTML = `
-    <div>
-      <h1>Count: ${count}</h1>
-      <button>Increment</button>
-    </div>
-  `
-
-  const node = template.content.cloneNode(true)
-  node.querySelector('button').onclick = increment
-
-  document.getElementById('app').replaceChildren(node)
+```js
+render() {
+  App.saveFocus();
+  App.$.list.replaceChildren(
+    ...Todos.all(App.filter).map(todo => App.createTodoItem(todo))
+  );
+  App.restoreFocus();
+  App.$.displayCount(Todos.all("active").length);
 }
 ```
-
-**5. Differential updates** (manual reconciliation):
-
-```javascript
-function updateList(newItems) {
-  const list = document.getElementById('list')
-  const currentItems = Array.from(list.children)
-
-  // Add new items
-  newItems.forEach((item, i) => {
-    if (currentItems[i]) {
-      // Update existing
-      currentItems[i].textContent = item.name
-    } else {
-      // Add new
-      const li = document.createElement('li')
-      li.textContent = item.name
-      list.appendChild(li)
-    }
-  })
-
-  // Remove extras
-  while (list.children.length > newItems.length) {
-    list.lastChild.remove()
-  }
-}
-```
-
-**The reality**: You're building your own rendering engine, or living with full re-renders.
-
-### Reconciliation
-
-**No reconciliation** - You do it manually:
-
-**Problem**: How do you efficiently update UI when state changes?
-
-**Naive approach** - Full re-render:
-```javascript
-function render() {
-  app.innerHTML = ''  // Destroy everything
-  app.appendChild(createUI())  // Rebuild everything
-}
-
-// Problems:
-// - Loses form input state
-// - Loses scroll position
-// - Loses focus
-// - Destroys and recreates DOM (slow)
-// - Event listeners lost
-```
-
-**Manual reconciliation** - Track elements:
-
-```javascript
-const elementCache = new Map()
-
-function updateItem(item) {
-  let element = elementCache.get(item.id)
-
-  if (!element) {
-    // Create new
-    element = document.createElement('li')
-    elementCache.set(item.id, element)
-    list.appendChild(element)
-  }
-
-  // Update existing
-  element.textContent = item.name
-
-  // Position might be wrong, need to handle ordering too!
-}
-```
-
-**You're reinventing React's reconciliation** - that's why React exists!
-
-**Keys** - Manual tracking:
-
-```javascript
-const itemElements = {}
-
-function renderList(items) {
-  const list = document.getElementById('list')
-
-  // Create/update items
-  items.forEach(item => {
-    if (!itemElements[item.id]) {
-      const li = document.createElement('li')
-      li.dataset.key = item.id
-      itemElements[item.id] = li
-      list.appendChild(li)
-    }
-    itemElements[item.id].textContent = item.name
-  })
-
-  // Remove deleted items
-  Object.keys(itemElements).forEach(key => {
-    if (!items.find(item => item.id == key)) {
-      itemElements[key].remove()
-      delete itemElements[key]
-    }
-  })
-}
-```
-
-**The truth**: Frameworks handle this complexity for you.
-
-### Templating & Syntax
-
-**No templating** - Multiple approaches:
-
-**1. Template literals** (modern, convenient):
-
-```javascript
-const html = `
-  <div class="card">
-    <h2>${title}</h2>
-    <p>${content}</p>
-  </div>
-`
-
-element.innerHTML = html
-```
-
-**Problems**:
-- No syntax highlighting/validation
-- XSS vulnerable
-- No type checking
-- Event handlers must be attached after
-
-**2. Template element** (HTML templates):
-
-```html
-<template id="card-template">
-  <div class="card">
-    <h2 class="title"></h2>
-    <p class="content"></p>
-  </div>
-</template>
-
-<script>
-function createCard(title, content) {
-  const template = document.getElementById('card-template')
-  const clone = template.content.cloneNode(true)
-
-  clone.querySelector('.title').textContent = title
-  clone.querySelector('.content').textContent = content
-
-  return clone
-}
-</script>
-```
-
-**3. createElement** (imperative, verbose):
-
-```javascript
-function createCard(title, content) {
-  const card = document.createElement('div')
-  card.className = 'card'
-
-  const heading = document.createElement('h2')
-  heading.textContent = title
-
-  const paragraph = document.createElement('p')
-  paragraph.textContent = content
-
-  card.appendChild(heading)
-  card.appendChild(paragraph)
-
-  return card
-}
-```
-
-**4. Tagged template literals** (custom):
-
-```javascript
-function html(strings, ...values) {
-  // Custom template processing
-  // Could sanitize, create elements, etc.
-  return strings.reduce((result, str, i) =>
-    result + str + (values[i] || ''), ''
-  )
-}
-
-const card = html`
-  <div class="card">
-    <h2>${title}</h2>
-    <p>${content}</p>
-  </div>
-`
-```
-
-**5. lit-html / uhtml** (libraries, not vanilla):
-
-Vanilla JS has no official templating. You choose your own approach.
 
 ### Component Model
 
-**No component model** - You build your own:
+There is no component model. The common patterns are:
 
-**1. Factory functions**:
-
-```javascript
-function Button({ text, onClick }) {
-  const button = document.createElement('button')
-  button.textContent = text
-  button.onclick = onClick
-  return button
-}
-
-document.body.appendChild(Button({
-  text: 'Click me',
-  onClick: () => alert('Clicked!')
-}))
-```
-
-**2. Classes**:
-
-```javascript
-class Button {
-  constructor(text, onClick) {
-    this.element = document.createElement('button')
-    this.element.textContent = text
-    this.element.onclick = onClick
-  }
-
-  mount(parent) {
-    parent.appendChild(this.element)
-  }
-
-  destroy() {
-    this.element.remove()
-  }
-}
-
-const btn = new Button('Click me', () => alert('Clicked!'))
-btn.mount(document.body)
-```
-
-**3. Web Components** (custom elements):
-
-```javascript
-class MyButton extends HTMLElement {
-  connectedCallback() {
-    const text = this.getAttribute('text')
-    this.innerHTML = `<button>${text}</button>`
-
-    this.querySelector('button').addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('clicked'))
-    })
-  }
-}
-
-customElements.define('my-button', MyButton)
-
-// Usage (like real HTML!)
-<my-button text="Click me"></my-button>
-
-// JavaScript
-document.querySelector('my-button')
-  .addEventListener('clicked', () => alert('Clicked!'))
-```
-
-**4. Revealing module pattern**:
-
-```javascript
-const Counter = (function() {
-  let count = 0
-  let element
-
-  function init(container) {
-    element = document.createElement('div')
-    element.innerHTML = `
-      <span class="count">0</span>
-      <button>Increment</button>
-    `
-    element.querySelector('button').onclick = increment
-    container.appendChild(element)
-  }
-
-  function increment() {
-    count++
-    render()
-  }
-
-  function render() {
-    element.querySelector('.count').textContent = count
-  }
-
-  return { init }
-})()
-
-Counter.init(document.body)
-```
-
-**No standard**:
-- No props system
-- No lifecycle hooks (except Web Components)
-- No child composition (except slots in Web Components)
-- You invent your own patterns
-
-### Performance Optimizations
-
-**1. DocumentFragment** (batch DOM changes):
-
-```javascript
-const fragment = document.createDocumentFragment()
-
-items.forEach(item => {
-  const li = document.createElement('li')
-  li.textContent = item.name
-  fragment.appendChild(li)
-})
-
-// Single reflow instead of N reflows
-list.appendChild(fragment)
-```
-
-**2. requestAnimationFrame** (smooth animations):
-
-```javascript
-function animate() {
-  element.style.left = position + 'px'
-  position++
-
-  if (position < 500) {
-    requestAnimationFrame(animate)
-  }
-}
-
-requestAnimationFrame(animate)
-```
-
-**3. Debouncing/Throttling** (reduce event frequency):
-
-```javascript
-function debounce(fn, delay) {
-  let timeout
-  return (...args) => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => fn(...args), delay)
-  }
-}
-
-input.addEventListener('input', debounce(handleInput, 300))
-```
-
-**4. Virtual scrolling** (render only visible items):
-
-```javascript
-// Manually calculate which items are visible
-// Only create DOM elements for those items
-// This is HARD to get right!
-```
-
-**5. Avoid layout thrashing**:
-
-```javascript
-// ❌ Bad - multiple reflows
-elements.forEach(el => {
-  el.style.width = el.offsetWidth + 10 + 'px'  // Read + write
-})
-
-// ✅ Good - batch reads and writes
-const widths = elements.map(el => el.offsetWidth)
-elements.forEach((el, i) => {
-  el.style.width = widths[i] + 10 + 'px'
-})
-```
-
-**6. Event delegation**:
-
-```javascript
-// ❌ Bad - listener per item
-items.forEach(item => {
-  item.addEventListener('click', handleClick)
-})
-
-// ✅ Good - single listener
-list.addEventListener('click', (e) => {
-  if (e.target.matches('li')) {
-    handleClick(e)
-  }
-})
-```
-
-**You must know and apply all optimizations manually**. No framework doing it for you.
-
-### Developer Experience
-
-**Learning curve: Low to High**
-- Basics: Very easy (just JavaScript!)
-- Building apps: High (you solve every problem yourself)
-
-**DevTools: Browser DevTools**
-- Elements panel: Inspect DOM
-- Console: Log and debug
-- Performance: Profile rendering
-- No framework-specific tools
-- No component hierarchy view
-
-**Hot reload: Manual**
-- No built-in hot reload
-- Need to set up build tools (Vite, etc.)
-- Refresh page to see changes
-- Lose application state on refresh
-
-### AI-Friendly Assessment
-
-**What makes vanilla rendering AI-friendly:**
-
-✅ **Direct and explicit**
-- `element.textContent = value` is clear
-- No hidden updates
-- Obvious what code does
-
-✅ **Standard APIs**
-- DOM APIs are well-documented
-- Stable and backward compatible
-- AI has seen countless examples
-
-✅ **No magic**
-- What you write is what executes
-- No compiler transforms
-- Predictable behavior
-
-**What creates friction:**
-
-⚠️ **Extreme verbosity**
-- Many lines to accomplish simple tasks
-- `document.createElement` dance for every element
-- Lots of boilerplate
-
-⚠️ **Manual synchronization**
-- Easy to forget to update DOM
-- State and UI desync silently
-- No warnings when out of sync
-
-⚠️ **No patterns**
-- Every project reinvents solutions
-- AI can't rely on conventions
-- Hard to know "correct" approach
-
-⚠️ **Error-prone**
-- Easy to create memory leaks
-- Easy to lose event listeners
-- Easy to write slow code (layout thrashing)
-
-⚠️ **Reconciliation is hard**
-- Efficiently updating lists is complex
-- Preserving state during updates is tricky
-- You're building a framework
-
-**Overall Rendering AI-Friendliness: 5/10**
-
-Vanilla rendering is explicit but extremely verbose and error-prone. AI must write lots of boilerplate and handle many edge cases manually.
+- **Factory functions** — `createTodoItem(todo)` returns a DOM node; no lifecycle, no props protocol.
+- **Plain objects with methods** — `App = { $: { ...refs }, init(), render(), ... }`.
+- **Web Components / `customElements.define`** — the platform's own component primitive; encapsulates shadow DOM and provides lifecycle callbacks, but adds ceremony and lacks reactive state.
 
 ## Event Handling
 
 ### Philosophy & Approach
 
-Vanilla JS event philosophy: **"Standard DOM events with addEventListener"**
+Standard DOM events with `addEventListener`. No synthetic event system. Event delegation is an explicit pattern — the developer decides where to delegate.
 
-**Core concepts**:
-- **Native events**: Browser's built-in event system
-- **addEventListener**: Standard API for event handling
-- **Event delegation**: Manual pattern for efficiency
-- **No framework abstractions**: Direct access to Event objects
-
-**This is the foundation** - all frameworks build on these APIs.
-
-### Event Binding
-
-**addEventListener** - Standard approach:
-
-```javascript
-const button = document.getElementById('button')
-
-button.addEventListener('click', function(event) {
-  console.log('Clicked!', event)
-})
-
-// With arrow function
-button.addEventListener('click', (event) => {
-  console.log('Clicked!', event)
-})
-
-// Named function
-function handleClick(event) {
-  console.log('Clicked!', event)
+```js
+todoEvent(event, selector, handler) {
+  delegate(App.$.list, selector, event, (e) => {
+    let $el = e.target.closest("[data-id]");
+    handler(Todos.get($el.dataset.id), $el, e);
+  });
 }
-
-button.addEventListener('click', handleClick)
 ```
 
-**Inline handlers** (old school, avoid):
+The `delegate` helper in the reference implementation is 4 lines and covers the common case.
 
-```html
-<!-- HTML onclick attribute -->
-<button onclick="alert('Clicked!')">Click</button>
+### Memory Management
 
-<!-- Property assignment -->
-<script>
-button.onclick = function() {
-  alert('Clicked!')
+`addEventListener` requires matching `removeEventListener` with the same function reference to clean up. `AbortController` is the modern solution for bulk cleanup:
+
+```js
+const controller = new AbortController();
+button.addEventListener("click", handler, { signal: controller.signal });
+form.addEventListener("submit", handler2, { signal: controller.signal });
+controller.abort(); // removes both
+```
+
+Without discipline, abandoned listeners cause memory leaks.
+
+---
+
+## Rubric Evidence
+
+### Evidence: Type-system integration
+
+**Categorical fact: `none` (for pure JS) / `community-types` (for TS-over-vanilla).**
+
+Vanilla JS has no type system. The two practical paths are:
+
+**Path A — pure JavaScript, no types.** Zero type safety. Typos in property names, passing wrong argument types, calling non-existent methods — all silent until runtime. This is the `typescript_support: "none"` reality for a pure vanilla JS project.
+
+**Path B — TypeScript with `// @ts-check` + JSDoc, or full `.ts` files with `tsc --noEmit`.** The TypeScript compiler can type-check plain `.js` files when `allowJs: true` and `checkJs: true` are set in `tsconfig.json`. This gives you the `tsserver`/`typescript-language-server` error experience without committing to TypeScript syntax. The DOM types (`lib.dom.d.ts`) that ship with TypeScript are maintained by Microsoft and cover the browser API surface comprehensively.
+
+A deliberate type error using JSDoc annotations:
+
+```js
+// @ts-check
+
+/**
+ * @param {HTMLInputElement} input
+ * @returns {string}
+ */
+function getValue(input) {
+  return input.valueAsNumber; // ← returns number, declared return type is string
 }
-</script>
 ```
 
-**Problems with inline/property**:
-- Only one handler per event type
-- Global scope pollution
-- Hard to remove
-- Modern code uses addEventListener
+Error from `tsc --noEmit`:
 
-**Options** (capture, once, passive):
-
-```javascript
-element.addEventListener('click', handler, {
-  capture: true,   // Use capture phase
-  once: true,      // Remove after first fire
-  passive: true    // Won't call preventDefault()
-})
-
-// Shorthand for capture
-element.addEventListener('click', handler, true)
+```
+error TS2322: Type 'number' is not assignable to type 'string'.
 ```
 
-### Event Flow
+The error is accurate and actionable. The limitation is that these annotations must be added manually — vanilla JS ships no types with it. DOM types come from TypeScript's bundled `lib.dom.d.ts`; they are not a separate `@types/` package but are community-maintained in the TypeScript repo rather than by the TC39/WHATWG standardization bodies.
 
-**Three phases**:
-1. **Capture**: Top to bottom (window → target)
-2. **Target**: Event reaches target element
-3. **Bubble**: Bottom to top (target → window)
+**Score rationale: 2.0.** Pure vanilla JS has no type system at all (floor case). The TS-over-vanilla path achieves reasonable coverage but requires the developer to opt in explicitly (no types by default, no enforcement, no build step required but recommended). The `typescript_support` field is set to `none` because vanilla JS ships no types — the TS path is an externally applied layer, not a feature of vanilla JS itself. Score 2 rather than 0 reflects that the opt-in path is real and practically accessible without changing language.
 
-```javascript
-// Capture phase
-parent.addEventListener('click', handleParent, true)
-child.addEventListener('click', handleChild, true)
+**No documentation friction** locating the `checkJs`/`allowJs` tsconfig pattern — TypeScript's own docs cover it at `typescriptlang.org/docs/handbook/type-checking-javascript-files.html`.
 
-// Bubble phase (default)
-parent.addEventListener('click', handleParent)
-child.addEventListener('click', handleChild)
+### Evidence: Compiler/build feedback quality
 
-// Click child: handleParent (capture) → handleChild (both) → handleParent (bubble)
+**There is no compiler for vanilla JS.** There is no build step. The developer's feedback loop is:
+
+1. **Browser DevTools console** — runtime errors after the fact.
+2. **`tsc --noEmit`** (opt-in) — static feedback before runtime, but only if the project has TypeScript configured.
+3. **ESLint** — linting for code quality, not type errors.
+
+**Deliberately-broken runtime example** — a common vanilla JS mistake, calling a method on a possibly-null element:
+
+```js
+// No null check:
+document.getElementById('nonexistent').textContent = 'Hello';
 ```
 
-**stopPropagation** - Stop bubbling:
+**Browser DevTools console output (Chrome/Firefox):**
 
-```javascript
-child.addEventListener('click', (e) => {
-  e.stopPropagation()  // Parent handlers won't fire
-  console.log('Child clicked')
-})
+```
+Uncaught TypeError: Cannot set properties of null (setting 'textContent')
+    at app.js:3
 ```
 
-**stopImmediatePropagation** - Stop all handlers:
+The error identifies the file and line. It does not tell you *why* the element is null (selector typo? not-yet-mounted? wrong ID?). You must trace that yourself.
 
-```javascript
-child.addEventListener('click', (e) => {
-  e.stopImmediatePropagation()
-  // Other handlers on same element won't fire
-})
+**Same mistake with `tsc --noEmit` and `strictNullChecks: true`:**
 
-child.addEventListener('click', () => {
-  console.log('Never runs!')
-})
+```
+error TS18047: 'document.getElementById('nonexistent')' is possibly 'null'.
 ```
 
-**preventDefault** - Prevent default behavior:
-
-```javascript
-form.addEventListener('submit', (e) => {
-  e.preventDefault()  // Don't reload page
-  handleSubmit()
-})
-
-link.addEventListener('click', (e) => {
-  e.preventDefault()  // Don't navigate
-  handleCustomNavigation()
-})
-```
-
-### Event Object
-
-**Native Event** - Standard DOM event:
-
-```javascript
-element.addEventListener('click', (event) => {
-  // Common properties
-  event.type         // 'click'
-  event.target       // Element that triggered event
-  event.currentTarget  // Element listener is attached to
-  event.timeStamp    // When event occurred
-
-  // Methods
-  event.preventDefault()
-  event.stopPropagation()
-  event.stopImmediatePropagation()
-
-  // Phase
-  event.eventPhase   // 1=capture, 2=target, 3=bubble
-  event.bubbles      // true if event bubbles
-  event.cancelable   // true if can preventDefault()
-})
-```
-
-**MouseEvent**:
-
-```javascript
-element.addEventListener('click', (e) => {
-  e.clientX, e.clientY   // Viewport coordinates
-  e.pageX, e.pageY       // Document coordinates
-  e.screenX, e.screenY   // Screen coordinates
-  e.button               // Which mouse button (0=left, 1=middle, 2=right)
-  e.buttons              // Bitmask of pressed buttons
-  e.altKey, e.ctrlKey, e.shiftKey, e.metaKey  // Modifier keys
-})
-```
-
-**KeyboardEvent**:
-
-```javascript
-input.addEventListener('keydown', (e) => {
-  e.key      // 'Enter', 'a', 'ArrowUp'
-  e.code     // 'Enter', 'KeyA', 'ArrowUp'
-  e.keyCode  // Deprecated
-  e.altKey, e.ctrlKey, e.shiftKey, e.metaKey
-
-  if (e.key === 'Enter') {
-    handleSubmit()
-  }
-})
-```
-
-**InputEvent** / **Event** (for inputs):
-
-```javascript
-input.addEventListener('input', (e) => {
-  e.target.value  // Current input value
-  e.inputType     // 'insertText', 'deleteContentBackward'
-})
-
-input.addEventListener('change', (e) => {
-  e.target.value  // Value when input loses focus or selection changes
-})
-```
-
-### Common Patterns
-
-**1. Event delegation** (critical pattern):
-
-```javascript
-// ❌ Bad - listener per item (doesn't scale)
-document.querySelectorAll('.item').forEach(item => {
-  item.addEventListener('click', handleItemClick)
-})
-
-// ✅ Good - single listener on parent
-list.addEventListener('click', (e) => {
-  const item = e.target.closest('.item')
-  if (item) {
-    handleItemClick(item)
-  }
-})
-```
-
-**2. Form handling**:
-
-```javascript
-form.addEventListener('submit', (e) => {
-  e.preventDefault()
-
-  const formData = new FormData(e.target)
-  const data = Object.fromEntries(formData)
-
-  console.log(data)  // { name: '...', email: '...' }
-})
-```
-
-**3. Passing data to handlers**:
-
-```javascript
-// ❌ Creates new function per item
-items.forEach(item => {
-  const button = createButton()
-  button.addEventListener('click', () => handleClick(item))
-})
-
-// ✅ Use data attributes
-button.dataset.id = item.id
-list.addEventListener('click', (e) => {
-  const id = e.target.dataset.id
-  handleClick(id)
-})
-```
-
-**4. Removing listeners**:
-
-```javascript
-// Must use same function reference!
-function handleClick() {
-  console.log('Clicked')
-}
-
-button.addEventListener('click', handleClick)
-button.removeEventListener('click', handleClick)
-
-// ❌ This won't work - different function
-button.addEventListener('click', () => console.log('Click'))
-button.removeEventListener('click', () => console.log('Click'))
-
-// AbortController (modern)
-const controller = new AbortController()
-
-button.addEventListener('click', handleClick, {
-  signal: controller.signal
-})
-
-// Remove all listeners added with this signal
-controller.abort()
-```
-
-**5. Debouncing/Throttling**:
-
-```javascript
-function debounce(fn, delay) {
-  let timeout
-  return (...args) => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => fn(...args), delay)
-  }
-}
-
-input.addEventListener('input', debounce((e) => {
-  console.log('Search:', e.target.value)
-}, 300))
-```
-
-**6. Custom events**:
-
-```javascript
-// Dispatch custom event
-element.dispatchEvent(new CustomEvent('myevent', {
-  detail: { data: 'some data' },
-  bubbles: true
-}))
-
-// Listen for custom event
-element.addEventListener('myevent', (e) => {
-  console.log(e.detail.data)
-})
-```
-
-### Performance Considerations
-
-**Event delegation** - Essential for performance:
-
-```javascript
-// For 1000 items:
-// ❌ Bad: 1000 event listeners
-items.forEach(item => {
-  item.addEventListener('click', handleClick)
-})
-
-// ✅ Good: 1 event listener
-list.addEventListener('click', (e) => {
-  // Handle all items
-})
-```
-
-**Passive listeners** - Improve scroll performance:
-
-```javascript
-// Tells browser handler won't call preventDefault()
-element.addEventListener('scroll', handleScroll, {
-  passive: true  // Browser can optimize
-})
-```
-
-**Memory leaks** - Must remove listeners:
-
-```javascript
-function mountComponent(element) {
-  function handleClick() {
-    console.log('Clicked')
-  }
-
-  element.addEventListener('click', handleClick)
-
-  // Must return cleanup function!
-  return () => {
-    element.removeEventListener('click', handleClick)
-  }
-}
-
-const cleanup = mountComponent(button)
-
-// Later...
-cleanup()  // Remove listener
-```
-
-**Common leak**: Listeners on removed elements:
-
-```javascript
-button.addEventListener('click', handleClick)
-button.remove()  // Element removed from DOM
-// But listener still in memory! (though browser may GC eventually)
-```
+TypeScript catches this before runtime, and the message is actionable. But this only applies if the project has opted into TypeScript tooling.
 
-**AbortController** helps manage cleanup:
+**Assessment:** Without TypeScript, the feedback loop is entirely runtime, in the browser console, after the code has already executed. The browser error messages are accurate but post-hoc — there is no pre-execution feedback pass. With TypeScript (`tsc --noEmit`), the story improves substantially, but the opt-in gap is large: most vanilla JS projects don't use TypeScript. A project with zero build tooling has zero pre-runtime type or pattern checking.
 
-```javascript
-const controller = new AbortController()
+**Score rationale: 3.0.** The floor (no tooling at all) scores a 1–2. The TS-over-vanilla path is real and useful, enough to push to 3. It can't score higher because the opt-in gap is large, the baseline experience is entirely post-hoc runtime errors, and there is no framework-level compile step that could catch framework-usage mistakes (because there is no framework).
 
-// Add multiple listeners with same signal
-button.addEventListener('click', handler1, { signal: controller.signal })
-input.addEventListener('input', handler2, { signal: controller.signal })
-form.addEventListener('submit', handler3, { signal: controller.signal })
+### Evidence: Locality of behavior
 
-// Clean up all at once
-controller.abort()
-```
+**Traced feature: "add a todo, see it appear in the list and the active count update in the footer."** Using the canonical `1Marc/modern-todomvc-vanillajs` reference (github.com/1Marc/modern-todomvc-vanillajs, accessed 2026-06-09).
 
-### Developer Experience
+Touchpoints required to understand or change this feature end to end:
 
-**Debugging: Browser DevTools**
-- Console: Log event objects
-- Sources: Set breakpoints in handlers
-- Event listener breakpoints: Break on all events of a type
-- No framework-specific tools
+1. `index.html` (69 lines) — `<template>` for the markup structure; `data-todo` attribute convention for DOM targeting.
+2. `js/app.js` (140 lines) — `App.$.input` keyup listener calls `Todos.add(...)`, then `App.render()` is triggered via the `save` event.
+3. `js/store.js` (71 lines) — `add({ title })` mutates `this.todos`, calls `this._save()` which dispatches the `save` event.
+4. `js/helpers.js` (13 lines) — `insertHTML`, `replaceHTML`, `delegate` utilities used in `createTodoItem` and rendering.
 
-**Common mistakes**:
-- Forgetting to remove listeners (memory leaks)
-- Using arrow functions and unable to remove
-- Calling handler instead of passing reference: `addEventListener('click', handleClick())`
-- Not using event delegation for dynamic content
+**Count: 4 files** — but the distribution is unusual compared to framework equivalents. There is no router file, no reducer file, no constants file, no separate component file. The entire application architecture is in these 4 files, with the largest being `app.js` at 140 lines covering both the "store connection" and "render logic" responsibilities that frameworks typically split.
 
-**No type safety without TypeScript**:
+**The locality paradox for vanilla JS:** Feature locality looks good (4 files) because there are no framework-mandated abstractions requiring additional files. But within each file, concerns are not separated by convention: `app.js` contains DOM querying, event binding, render logic, and focus management all interleaved. A developer changing the "active count display" must read 140 lines of app.js to find the relevant section. There's no "`footer.jsx` is responsible for the count" signal — the developer must know where to look.
 
-```typescript
-element.addEventListener('click', (e: MouseEvent) => {
-  e.clientX  // TypeScript knows about MouseEvent properties
-})
-```
+**Score rationale: 4.0.** Low file count inflates apparent locality. The absence of enforced separation means each file is a large multi-concern blob, and tracing a feature within a file requires reading more prose than a framework equivalent where the file has a single declared responsibility. Score reflects: better than heavily-layered frameworks (fewer files), worse than component-based frameworks (no per-concern file boundaries within app.js).
 
-### AI-Friendly Assessment
+### Evidence: Explicitness / data-flow traceability
 
-**What makes vanilla events AI-friendly:**
+**Traced: clicking "toggle all" checkbox from event to DOM update**, using the canonical `1Marc/modern-todomvc-vanillajs`.
 
-✅ **Standard web APIs**
-- Well-documented on MDN
-- Stable and backward compatible
-- AI has seen endless examples
+**Hops:**
 
-✅ **Explicit**
-- `addEventListener` is clear
-- Event object has all needed info
-- No magic, no indirection
+1. `App.$.toggleAll.addEventListener("click", ...)` in `app.js` — explicit `addEventListener` binding. **Explicit.**
+2. Inside the handler: `Todos.toggleAll()` — explicit function call. **Explicit.**
+3. `toggleAll()` in `store.js` sets `this.todos = this.todos.map(...)`, then calls `this._save()`. **Explicit.**
+4. `_save()` calls `window.localStorage.setItem(...)` then `this.dispatchEvent(new CustomEvent("save"))`. **Explicit.**
+5. `Todos.addEventListener("save", App.render)` was registered in `App.init()` — the `save` event dispatches and invokes `App.render`. This is the **one semi-implicit hop**: the event dispatch routes through the EventTarget listener table. It is not magic — `addEventListener` is standard and the connection is in the same `init()` function — but it's a non-local jump a reader must trace back to `init()` to understand.
+6. `App.render()` calls `App.$.list.replaceChildren(...)`, rebuilding the list, then `App.$.displayCount(...)`. **Explicit.**
 
-✅ **Full Event object access**
-- All native properties available
-- No framework wrappers
-- Direct browser APIs
+**Tally: 5 explicit hops, 1 semi-implicit hop (CustomEvent dispatch → listener invocation).** The total hop count (6) is low and every hop is a direct function call or a standard DOM API — there is no framework scheduler, no reactive graph traversal, no virtual DOM diffing between trigger and render. The developer can read every line of the call chain without consulting framework internals.
 
-**What creates friction:**
+**Contrast:** Frameworks with signals or reactive stores add one implicit "dependency graph walk" hop between state write and DOM update. React's `dispatch` → `reconciler` → re-render is two implicit hops. Vanilla JS has fewer implicit hops than any framework — but only because the developer wrote the explicit hops themselves.
 
-⚠️ **Memory leak potential**
-- Must manually remove listeners
-- Easy to forget
-- No warnings when leaking
+**Score rationale: 8.5.** Explicitness is vanilla JS's defining strength. Everything is a function call or a DOM API. The one semi-implicit hop (EventTarget listener dispatch) is minimal and standard. Score does not reach 9–10 only because the EventTarget pattern requires the reader to know where listeners were registered (which may be in a different function, requiring cross-file search), and because the lack of conventions means some vanilla codebases use much more implicit patterns (global mutation, inline `innerHTML` with interpolated callbacks) that score lower on this dimension.
 
-⚠️ **Verbose**
-- `addEventListener` is long to type
-- Remove requires same function reference
-- Lots of boilerplate
+### Evidence: Convention strength
 
-⚠️ **Event delegation is manual**
-- Must implement pattern yourself
-- Easy to get wrong
-- No built-in support
+**Canonical task probed: "fetch data and display a list when the page loads."** Surveyed MDN, popular vanilla JS tutorials, the 2025 Stack Overflow top JavaScript answers, and the broader ecosystem to count distinct idiomatic-looking approaches in active use.
 
-⚠️ **No declarative modifiers**
-- Must call `preventDefault()` manually
-- Must call `stopPropagation()` manually
-- More imperative code
+1. **`fetch` + `.then()` chain, set `innerHTML` on resolve** — the oldest idiom; still present in the majority of MDN examples and Stack Overflow answers. Mixes template strings into innerHTML (XSS risk).
+2. **`async function init()` + `await fetch()` + `document.createElement` loop** — modern async/await; avoids innerHTML; verbose but safer; no shared convention on how to structure `init`.
+3. **`async function init()` + `await fetch()` + template literal set via `innerHTML` with a `DOMParser` or `template` element for sanitization** — a hybrid pattern; documented by some security-focused guides but not by others.
+4. **Module-scoped singleton store + `EventTarget` + `render()` function** — the pattern exemplified by `1Marc/modern-todomvc-vanillajs`; clearly the best-practice modern idiom, but not documented in any official guide (MDN has no "recommended app structure").
+5. **Global variables + `DOMContentLoaded` + procedural script** — still common in educational contexts and simple pages; no module system; completely valid.
+6. **`XMLHttpRequest`** — deprecated in new code but common in legacy codebases and still in many tutorials and SO answers because the questions are from 2012–2018.
+7. **Web Component with `connectedCallback` + `fetch`** — standards-based encapsulation for a data-fetching component; a seventh distinct idiom for component-oriented vanilla JS.
 
-⚠️ **Cleanup complexity**
-- Must track all listeners to remove
-- AbortController helps but adds complexity
-- Easy to leak
+**Count: at least 6–7 distinct, actively-circulating, idiomatic-looking approaches.** Unlike React (where low convention strength reflects a framework philosophy of "UI library, not opinionated about everything"), vanilla JS has low convention strength because there is no framework at all — every pattern is equally "official." MDN documents browser APIs, not application architecture. There is no styleguide, no "idiomatic vanilla JS" document analogous to Vue's style guide or React's Thinking in React.
 
-**Overall Event Handling AI-Friendliness: 7/10**
+**Documentation friction note:** Locating a single authoritative source for "the right way to structure a vanilla JS app" was impossible — because no such source exists. MDN provides API references; the closest thing to an architectural recommendation is the TodoMVC reference implementation, which is maintained by one person and is not an official standard. This absence is itself the evidence for the score.
 
-Vanilla events are explicit and standard, but verbose and error-prone. Manual memory management is the biggest friction.
+**Score rationale: 1.0.** The lowest possible score is appropriate for a "no-framework" baseline. There are no enforced conventions, no official styleguide, no framework CLI that scaffolds a canonical structure. Every project invents its own patterns. An agent generating vanilla JS has no canonical signal to prefer one approach over another.
 
-### Component Reusability Assessment
+### Evidence: Token efficiency / boilerplate density
 
-**Quality: Good (7/10)**
+**Source: canonical reference implementation — `1Marc/modern-todomvc-vanillajs`, `github.com/1Marc/modern-todomvc-vanillajs` (accessed 2026-06-09).** This is the most widely-cited modern vanilla JS TodoMVC implementation; the author wrote it explicitly to demonstrate how little code a modern vanilla JS app requires compared to the 2016 official TodoMVC vanilla-es6 example. It targets the identical TodoMVC spec used by all other framework references in this corpus. Taking the TodoMVC-first path per the protocol: this is a vetted, publicly maintained reference, not a freehand attempt.
 
-**Strengths**: Web Components are standards-based - work everywhere. No build tools required. No framework lock-in. Custom elements register once, use anywhere. Template literals enable composition. Modules (ESM) for code splitting. CSS custom properties for theming. Shadow DOM provides encapsulation.
+Note on the official `tastejs/todomvc` vanilla examples: the repo also contains `examples/javascript-es5` and `examples/javascript-es6`, but both use webpack and older patterns. The `1Marc/modern-todomvc-vanillajs` example is the more representative modern reference (no build tools, current browser APIs, module syntax).
 
-**Weaknesses**: Boilerplate-heavy - lots of manual DOM manipulation. No reactivity - must manually update DOM. Lifecycle callbacks verbose. Props require setAttribute/getAttribute. No type safety without TypeScript setup. Testing requires DOM environment. State management manual.
+Line counts:
 
-**Cross-Project Reuse**: Excellent for web components - true framework independence. Functions and classes reusable via ES modules. Cannot leverage framework ecosystems. Design systems require manual work.
+| File | Lines | Role |
+|---|---|---|
+| `js/app.js` | 140 | All UI logic: DOM refs, event binding, render, focus save/restore |
+| `js/store.js` | 71 | State store: CRUD mutations, localStorage persistence, EventTarget pub/sub |
+| `js/helpers.js` | 13 | Utilities: `delegate`, `insertHTML`, `replaceHTML`, `getURLHash` |
+| `index.html` | 69 | Markup: form, list, footer, filter links |
+| **Total** | **293** | |
 
-**Design System Support**: Possible but manual. Web components ideal but require implementation work. Shoelace (web components) proves viability. CSS custom properties for tokens. Shadow DOM for encapsulation. More effort than framework component libraries.
+**Observations:**
 
-## Maintainability
+- 293 lines for the full TodoMVC spec (add, toggle, edit in place, delete, toggle all, filter, clear completed, active count, localStorage persistence).
+- This is notably lower than the React canonical reference (312 lines) and achieves the same spec. The vanilla advantage: no component files, no constant files, no reducer — everything is in 3 JS files.
+- The efficiency comes with a cost: `app.js` is a 140-line multi-concern module. React's 312 lines are split across 8 files with single-responsibility boundaries. The vanilla implementation is token-efficient but locality-poor within each file.
+- **Boilerplate nature differs:** vanilla's lines are mostly *logic* (event handlers, DOM queries, conditional rendering decisions). React's overhead is structural (imports, component function wrappers, hook call syntax, prop destructuring). Vanilla has less structural overhead but requires writing explicit DOM manipulation that frameworks handle implicitly.
+- **Full re-render on every change** — `App.render()` rebuilds the entire list via `replaceChildren` on every state mutation. This is simple but means 293 lines handle no incremental reconciliation; a production app requiring stable focus, animations, or large lists would need significantly more code.
 
-**Quality: Fair (6/10)**
+**Score rationale: 4.0.** Raw line count is competitive with React for a simple app, but token efficiency for the general case is low because every feature requires explicit DOM manipulation code that frameworks generate automatically. Adding a new feature (e.g., due dates) would require writing DOM creation + event binding + render updates + store mutations — all manually. In a framework, the new feature is mostly the new state and a template update. Score 4 rather than 3: vanilla JS is not as verbose as it is often caricatured for simple apps; the 293-line reference is real. Score does not reach 5: the manual-DOM overhead grows superlinearly with feature complexity, and the absence of a component model means each new UI element costs the same verbosity as the first.
 
-**Strengths**: No framework churn - JavaScript is stable. No build tools means simple setup. Browser DevTools work perfectly. No magic - what you write is what runs. Standards-based means longevity. TypeScript can add type safety. Code splits with ES modules.
+### Evidence: Familiarity composite
 
-**Weaknesses**: Manual DOM updates error-prone. No reactivity means forgetting to update UI. Memory leaks from event listeners. querySelector fragile (typos, structure changes break code). No DevTools for component state. Verbose compared to frameworks. Testing requires DOM setup (jsdom). No hot reload without tooling. Performance optimization manual.
+**Four proxies:**
 
-**Code Organization**: No enforced structure - every project different. Common patterns: modules by feature, separate DOM/logic/styles. Web components enforce some structure. Utils libraries for helpers.
+1. **Age-weighted community volume.** JavaScript was first released in 1995 (31 years ago); it is the most-discussed topic on Stack Overflow by total question count — over 2.5 million questions tagged `javascript` as of 2025-2026. The 2025 Stack Overflow Developer Survey reports JavaScript as the most-used programming language at 66% of respondents (13th consecutive year). This is the deepest pretraining corpus of any technology in this review set, by a wide margin.
 
-**Testing**: Jest + jsdom for unit tests. Playwright/Cypress for E2E. Must mock DOM methods. Component testing harder without framework. querySelector makes tests brittle. Snapshot testing possible but manual.
+2. **GitHub activity.** There is no single GitHub repo for vanilla JS (the spec lives at github.com/tc39/ecma262 and github.com/whatwg/html). The proxy here is the sum of activity across all vanilla-JS-reliant projects — which is the entire web platform. Structurally, this is a maximum-signal data point: AI models were trained on vastly more vanilla JS than any framework, because every framework tutorial, example, and SO answer contains vanilla JS alongside the framework code.
 
-**Debugging**: Browser DevTools excellent. Can set breakpoints, inspect DOM, profile performance. No component tree view like React DevTools. Console.log everywhere. Network tab for fetch. No time-travel debugging.
+3. **Registry trend direction.** `npm_package: null` — there is no npm package. This is a structural undercount that should be called out: the entire npm ecosystem is built on top of vanilla JS, so every npm download implicitly signals vanilla JS usage. The direction is strongly positive and the signal is everywhere.
 
-**Scalability**: Fair. Large vanilla apps require discipline. No automatic code-splitting - manual with import(). No component boundaries - must design yourself. State management requires library or custom implementation. Performance requires manual optimization (virtualization, etc.). Large apps benefit from micro-framework approach.
+4. **`first_released`: 1995.** The oldest technology in this corpus by over a decade. Age-weighting strongly favors vanilla JS for pretraining coverage: 31 years of documentation, tutorials, blog posts, Stack Overflow Q&A, and example code.
 
-**Breaking Changes**: JavaScript evolves slowly. Web standards stable. No framework updates to track. Polyfills for old browsers. Most maintenance is dependency updates (bundlers, TypeScript, etc.).
+**Triangulation:** All four proxies point at the same ceiling. JavaScript is universally familiar to AI models — it is the language all four major browser engines implement, the language nearly all web tutorials start from, and the language underlying every JavaScript framework the model has ever seen. There is no plausible scenario in which a frontier model knows React idioms but not vanilla JS. The familiarity ceiling is unambiguously 10.
 
-## AI-Assisted Development Considerations
+**Score rationale: 10.0.** The maximum score. No other technology in this corpus has broader or deeper pretraining coverage.
 
-### What Works Well with AI
+**No documentation friction** — finding usage statistics was straightforward via Stack Overflow's developer survey and tag pages.
 
-**No framework to learn**
-- Just JavaScript + DOM APIs
-- Fewer concepts to understand
-- Standard web platform
+### Evidence: Stability / convention durability
 
-**Explicit and predictable**
-- What you write is what runs
-- No compiler magic
-- No hidden behavior
+**ECMAScript evolves slowly and carefully.** The TC39 process requires Stage 4 (two independent implementations in browsers, test262 test suite, specification text complete) before inclusion in the annual spec. Breaking changes are essentially impossible — the web's backwards-compatibility guarantee means existing JavaScript code written in 1995 still runs in today's browsers.
 
-**Maximum flexibility**
-- Can do anything browsers support
-- No framework constraints
-- Full control
+**DOM/Web APIs are even more stable.** WHATWG's Living Standard approach makes additive-only changes; APIs are never removed from browsers once shipped to avoid breaking existing pages. `addEventListener`, `querySelector`, `fetch`, `localStorage` — all present and unchanged for the duration of any project's lifetime.
 
-**Direct debugging**
-- Set breakpoints in your code
-- No framework internals to trace
-- Console.log just works
+**ES2025 changelog (June 2025):** Iterator helpers, `Promise.try`, new Set methods (`intersection`, `union`, `difference`, `symmetricDifference`, `isSubsetOf`, `isSupersetOf`, `isDisjointFrom`), `Float16Array`, JSON modules, `RegExp.escape`. All additive. Zero breaking changes.
 
-### What Creates Friction
+**ES2026 draft status (next_release):** Temporal API (Stage 4 since March 2026), Intl era/monthCode. Still additive. No breaking changes.
 
-**Reinventing everything**
-- No state management
-- No component model
-- No reactivity
-- Must build from scratch
+**Citation:** tc39.es/ecma262/2026/multipage/ (ES2026 draft), 262.ecma-international.org/ (ES2025 final).
 
-**Extreme verbosity**
-- Lots of boilerplate
-- Manual DOM manipulation
-- Verbose API names
+**Stability penalty:** None (`stability_penalty: false`). The ES2026 additions are improvements, not deprecations or breaking changes. This contrasts sharply with framework entries where a major version bump or architecture change triggers a stability penalty.
 
-**Easy to write buggy code**
-- Memory leaks (forgotten listeners)
-- State/UI desync
-- Performance issues (layout thrashing)
-- XSS vulnerabilities (innerHTML with user input)
+**Score rationale: 9.0.** Vanilla JS scores as high as any technology in this corpus for stability. The one deduction from 10: the *convention landscape* for vanilla JS is unstable not because the platform breaks, but because there are no conventions to stabilize. The "right way" to structure a vanilla JS app in 2020 was different from 2016, and different again in 2025. The platform APIs are stable; the ecosystem's practices around them are not. Score 9 rather than 10 reflects this gap between platform stability (perfect) and convention durability (low, because conventions don't exist in the first place).
 
-**No patterns or conventions**
-- Every project different
-- AI can't rely on structure
-- Hard to know "right" way
+### Evidence: Ecosystem tooling facts
 
-**Manual optimization**
-- Must know and apply all best practices
-- Easy to write slow code
-- No framework optimizations
+**Devtools:**
+- [x] Browser DevTools (Chrome, Firefox, Safari, Edge) — built-in, no installation required. Elements panel, console, network, performance profiler, memory profiler, sources debugger with sourcemap support. This is the best-in-class debugging experience for browser code: no framework plugin required, everything is directly inspectable.
+- [ ] Framework-specific devtools — none, by definition.
+- [ ] Component tree viewer — not applicable (no component model).
+- [ ] State inspector — not applicable (no framework state management).
 
-**Lots of edge cases**
-- Event listener cleanup
-- List reconciliation
-- Form state
-- All manual
+**Test utilities:**
+- [x] `jsdom` (via Jest or standalone) — provides a DOM implementation for Node.js test environments. Widely used; actively maintained.
+- [x] `@testing-library/dom` — framework-agnostic DOM testing utilities; works with vanilla JS.
+- [x] Playwright / Cypress / Puppeteer — end-to-end testing tools that run against real browsers; fully compatible with vanilla JS (no framework adapter needed).
+- [x] Web Test Runner (`@web/test-runner`) — runs tests in a real browser, no jsdom approximation needed; well-suited for vanilla JS Web Components.
+- [ ] Component-level unit test utilities — not applicable (no component model).
 
-### Opportunities for Improvement
+**IDE/LSP support:**
+- [x] `typescript-language-server` (github.com/typescript-language-server/typescript-language-server) — provides JS/TS language intelligence (autocomplete, hover types, go-to-definition, find-references) for vanilla JavaScript in VS Code, Neovim, Emacs, and any editor that implements LSP. Ships as the JS/TS backend in VS Code's built-in JS support.
+- [x] VS Code built-in JavaScript language support — powered by `tsserver`; works on plain `.js` files without any `tsconfig.json` for basic intellisense.
+- [x] ESLint — static analysis for code quality and common mistakes; widely configured for vanilla JS projects.
+- [x] Prettier / Biome — code formatting; both work on plain JS with no configuration.
 
-**What vanilla JS teaches us for next-gen frameworks:**
+**What's missing compared to framework entries:**
+- No framework-specific DevTools panel (no component inspector, no store viewer, no render timing tree).
+- No HMR / hot module replacement without adding a build tool like Vite (which is optional and external to vanilla JS itself).
+- No type-checked template syntax (JSX/SFC tooling); DOM manipulation errors only surface at runtime unless TypeScript is configured.
 
-1. **Explicitness is good**
-   - Direct DOM manipulation is clear
-   - No magic makes debugging easier
-   - Frameworks should minimize magic
+**Score rationale: 6.0.** Browser DevTools are genuinely excellent and available with zero setup — a real advantage. The TypeScript LSP path for type checking is accessible. Testing tools (Playwright, jest+jsdom) are first-class. The deductions from a higher score: no framework-specific devtools, no HMR by default, no component-level isolation testing utilities (because there's no component model), and the type-checking story requires opt-in setup that most vanilla JS projects don't do. Score 6 reflects "solid general platform tooling, no framework-layer tooling, opt-in type support."
 
-2. **But automation is necessary**
-   - Manual state/UI sync is error-prone
-   - Automatic reactivity is huge win
-   - Frameworks exist for a reason
+---
 
-3. **Standard APIs are powerful**
-   - Web Components show native can work
-   - Template element is useful
-   - Proxy enables reactivity
+## On the Horizon
 
-4. **Verbosity hurts**
-   - `document.createElement` is tedious
-   - Framework terseness (JSX, templates) helps
-   - But don't hide too much
+### Next release
 
-5. **Memory management matters**
-   - Easy to leak with manual listeners
-   - Frameworks should handle cleanup
-   - Automatic lifecycle management is valuable
+- **Name/version:** ES2026 (draft at tc39.es/ecma262/2026/multipage/)
+- **Status:** announced
+- **What's changing:** Temporal API (final — Stage 4 as of March 2026 TC39 meeting), Intl era/monthCode. ES2025 (the current ratified standard) added Iterator helpers, `Promise.try`, Set methods, `Float16Array`, JSON modules, and `RegExp.escape`. Neither ES2025 nor ES2026 touch the DOM API surface, event model, or state management patterns.
+- **Anticipated impact:** Zero rubric impact. New language features improve ergonomics (Temporal is a long-overdue replacement for `Date`) but do not change the locality, explicitness, convention-strength, or token-efficiency evidence in this review. The scoring dimensions are about the DOM/event/state interaction patterns, which are governed by WHATWG Living Standards that evolve additive-only.
+- **Stability penalty:** No — the backwards-compatibility guarantee of the web platform is absolute. See `next_release.stability_penalty: false` in frontmatter.
 
-6. **Event delegation pattern is powerful**
-   - Should be framework default
-   - Frameworks can automate this
-   - Huge performance win
+### AI-tooling investment
 
-**For next-gen frameworks:**
-- Keep explicitness of vanilla (what you write is clear)
-- Add automatic reactivity (state → UI)
-- Provide component model (but stay close to web standards)
-- Handle memory management automatically
-- Minimize magic, maximize clarity
-
-**Final AI-Friendliness: 6/10**
-- State Management: 6/10 (total freedom, total responsibility)
-- Rendering: 5/10 (explicit but extremely verbose)
-- Event Handling: 7/10 (standard APIs, but manual cleanup)
-
-**The truth**: Vanilla JS is the simplest in concept but most complex in practice. Frameworks exist because managing state, rendering, and events manually at scale is untenable.
-
-**For AI**: Vanilla JS forces AI to write more code and handle more edge cases. Frameworks with good patterns help AI by providing conventions and safety rails.
-
-**The baseline value**: Understanding vanilla JS shows *why* frameworks exist and what problems they solve. Every framework is built on these foundations.
+- **What exists:** None, by design. MDN Web Docs does not publish an `llms.txt`. There is no MCP server for "the browser platform." There are no curated AI-facing guidelines for vanilla JS as a category — MDN is the reference and it is comprehensive enough that AI models training on MDN content directly is the baseline.
+- **Observed delta:** Tested the canonical TodoMVC exercise with and without MDN explicitly loaded as context. No measurable difference in code quality or idiom correctness — the model's pretraining already saturates MDN-level vanilla JS knowledge (consistent with the familiarity score of 10.0). The meaningful friction in the exercise was not knowledge gaps; it was the absence of conventions. The agent produced correct code in both conditions but invented different structures each time (different file layout, different event wiring approach) because there is no canonical signal to converge on. This is the real AI-tooling story for vanilla JS: the platform knowledge is there; the convention deficit means the agent must make arbitrary architectural choices, producing inconsistent output that is correct but not idiomatic to any shared standard.

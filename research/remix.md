@@ -5,347 +5,159 @@ github_url: "https://github.com/remix-run/remix"
 docs_url: "https://remix.run"
 implementation_language: "TypeScript"
 status: "active"
-type_system_score: null
-compiler_feedback_score: null
-locality_score: null
-explicitness_score: null
-convention_strength_score: null
-token_efficiency_score: null
-familiarity_score: null
-stability_score: null
-tooling_score: null
+type_system_score: 8
+compiler_feedback_score: 7
+locality_score: 8.5
+explicitness_score: 8.5
+convention_strength_score: 8
+token_efficiency_score: 7
+familiarity_score: 7
+stability_score: 5
+tooling_score: 7.5
+version: "2.17.5"
+npm_package: "@remix-run/react"
+ai_tooling:
+  mcp_server:
+    available: false
+    url: null
+    party: null
+  guidelines: null
+  llms_txt: false
+  style_guides: null
+  observed_delta: "No official AI tooling exists for Remix (no llms.txt, no MCP server, no curated guidelines). The canonical TodoMVC exercise (kentcdodds/remix-todomvc) was used as the token-efficiency reference both with and without AI tooling; without tooling the produced code was idiomatic because Remix's explicit file-export conventions are already heavily represented in LLM training corpora — there was no meaningful delta to report."
+next_release:
+  name: "Remix 3"
+  status: "beta"
+  changes: "Full rewrite dropping React entirely. Ships a Preact fork as the component runtime, replaces declarative hook-based state with an imperative this.update() model, eliminates virtual DOM, and requires a complete rewrite with no migration path from Remix 2. Beta 4 released June 5, 2026."
+  anticipated_impact: "If Remix 3 ships stable, this review describes a different framework than what 'Remix' will mean going forward. Every rubric dimension would change: type_system (Preact-based), rendering_strategy (no vdom), state_model (imperative), familiarity (new patterns). A fresh review file superseding this one would be warranted."
+  stability_penalty: true
+components: null
+supersedes: null
+superseded_by: null
+typescript_support: "native"
+license: "MIT"
+runtime: "both"
 capabilities:
-  state_management: false
-  rendering: false
-  event_handling: false
+  state_management: true
+  rendering: true
+  event_handling: true
+paradigm: "declarative"
+state_model: "immutable"
+rendering_strategy: "virtual-dom"
+maintainer: "Shopify / remix-run"
+first_released: "2021"
+reviewed_date: "2026-06-08"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Rewrite-detection check performed before writing: Remix 3 (beta, not production-ready as of June 2026) is a genuine paradigm rewrite that drops React entirely — but the current stable release is 2.17.5, which is still the React-based meta-framework. This review covers the stable production version (2.x). Remix 3 is tracked in next_release with stability_penalty: true. If Remix 3 ships stable, a new file should be created with supersedes pointing at this one. The existing remix.md had all-null scores and used the pre-rubric template; this is a full from-scratch evidence pass against the 9-dimension agentic-dev rubric."
 ---
 
 # Remix
 
-> **2026 update note (2026-06-07):** Remix 3 (beta preview, April 2026) is a ground-up rewrite that **drops React entirely** — it ships its own component model on web standards (Fetch API runtime, no virtual DOM; JSX syntax remains but compiles differently), with no migration path from Remix 2. If it ships stable, this review (written against Remix-on-React) describes a different framework than what "Remix" will mean going forward — treat the analysis below as covering "Remix 2 / classic Remix" and plan a fresh review once Remix 3 stabilizes.
-
-## Philosophy & Mental Model
-
-Remix is **"a full-stack web framework that focuses on web fundamentals and modern UX."** Created by the React Router team, Remix is now merged into React Router v7 as its full-stack evolution.
-
-**Mental model**: **Web-first, not SPA-first**. Where Next.js extends React into a meta-framework, Remix starts with the web platform (HTTP, forms, URLs) and uses React as the rendering layer. The philosophy is **progressive enhancement**—build with standard HTML forms, enhance with JavaScript.
-
-**Core principles:**
-
-1. **Server-Side First** - Data fetching happens on the server via loaders
-2. **Web Standards** - Built on Fetch API, FormData, Response objects
-3. **Progressive Enhancement** - Works without JavaScript, enhances with it
-4. **Nested Routing** - URL segments map to data boundaries and UI
-5. **No Loading States** - Parallel data loading eliminates "Spinnageddon"
-
-**Key insight**: Remix treats the **URL as the state**. Instead of useState/Redux for server data, URLs drive what loads. Instead of onClick handlers for mutations, HTML forms with POST actions handle writes.
-
-Remix is for building full-stack React apps that embrace HTTP and web standards instead of fighting them.
+Remix is a full-stack web meta-framework built on React. Its defining philosophy is "web-first, not SPA-first": data loading and mutations are modeled on HTTP fundamentals (loaders for GET, actions for POST/PUT/DELETE, standard `FormData`, `Response`, and `Request` objects) rather than client-side state management. Remix merged with React Router at v7, so Remix 2.x and React Router v7 Framework Mode are the same codebase under two entry points.
 
 ## State Management
 
-### Server State (Loaders)
+### Philosophy & Mental Model
 
-**Loaders** fetch data on the server before rendering:
+Remix treats the URL as the primary state primitive for server data. Instead of `useState` + `useEffect` + a loading spinner, a route defines a `loader` that fetches data before render. Mutations use HTML `<Form>` components that POST to the route's `action` — no manual `fetch`, no `event.preventDefault()` boilerplate.
 
-```typescript
-// app/routes/projects.$id.tsx
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+Client UI state (open/closed, hover, etc.) uses plain React hooks as normal.
 
-export async function loader({ params }: LoaderFunctionArgs) {
-  const project = await db.project.findUnique({
-    where: { id: params.id }
-  });
+### Core Primitives
 
-  if (!project) {
-    throw json("Not Found", { status: 404 });
-  }
+- **`loader`** — async function that runs on the server (or edge) before the route renders; returns data via `json()` or a `Response`
+- **`action`** — handles POST/PUT/DELETE form submissions; returns data or a redirect
+- **`useLoaderData<typeof loader>()`** — reads loader return value with full TypeScript type inference
+- **`useActionData<typeof action>()`** — reads action return value (validation errors, etc.)
+- **`useFetcher()`** — fire-and-forget mutations or data loads outside the main navigation lifecycle
+- **`useNavigation()`** — tracks pending state for optimistic UI
 
-  return json({ project });
-}
-
-export default function Project() {
-  const { project } = useLoaderData<typeof loader>();
-
-  return (
-    <div>
-      <h1>{project.title}</h1>
-      <p>{project.description}</p>
-    </div>
-  );
-}
-```
-
-**Read pattern**: `useLoaderData()` accesses data from the route's loader. TypeScript infers types automatically via `typeof loader`.
-
-**Update pattern**: Data refreshes automatically on navigation. No manual cache invalidation needed—Remix revalidates loaders after actions complete.
-
-### Mutations (Actions)
-
-**Actions** handle POST/PUT/DELETE requests:
+### Update Mechanism
 
 ```typescript
+// app/routes/todos.tsx
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
-  const title = formData.get("title");
-
-  const project = await db.project.create({
-    data: { title: String(title) }
-  });
-
-  return redirect(`/projects/${project.id}`);
+  const title = String(formData.get("title"));
+  await db.todo.create({ data: { title } });
+  return redirect("/todos");          // explicit redirect
 }
 
-export default function NewProject() {
+export default function Todos() {
   return (
     <Form method="post">
-      <input name="title" />
-      <button type="submit">Create</button>
+      <input name="title" required />
+      <button type="submit">Add</button>
     </Form>
   );
 }
 ```
 
-**Write pattern**: Standard HTML `<Form>` posts to the route's action. No `event.preventDefault()`, no client-side fetch boilerplate.
+After the action completes, Remix automatically re-runs all active loaders — no manual cache invalidation.
 
-### Client State
-
-Use React hooks for UI-only state:
+### Read Pattern
 
 ```typescript
-export default function Accordion() {
-  const [isOpen, setIsOpen] = useState(false);
+export async function loader({ request }: LoaderFunctionArgs) {
+  const todos = await db.todo.findMany();
+  return json({ todos });
+}
 
-  return (
-    <div>
-      <button onClick={() => setIsOpen(!isOpen)}>Toggle</button>
-      {isOpen && <div>Content</div>}
-    </div>
-  );
+export default function TodoList() {
+  const { todos } = useLoaderData<typeof loader>();
+  // todos is fully typed as the serialized return type of the loader
+  return <ul>{todos.map(t => <li key={t.id}>{t.title}</li>)}</ul>;
 }
 ```
 
-**Philosophy**: Server state (data) via loaders/actions. Client state (UI) via React hooks. No overlap.
+### Reactivity & Granularity
 
-### Optimistic UI
-
-**useNavigation** for instant feedback:
-
-```typescript
-import { useNavigation } from "@remix-run/react";
-
-export default function Projects() {
-  const navigation = useNavigation();
-  const busy = navigation.state === "submitting";
-
-  return (
-    <Form method="post">
-      <input name="title" />
-      <button disabled={busy}>
-        {busy ? "Creating..." : "Create Project"}
-      </button>
-    </Form>
-  );
-}
-```
-
-**useFetcher** for background mutations:
-
-```typescript
-import { useFetcher } from "@remix-run/react";
-
-export default function Task({ task }) {
-  const fetcher = useFetcher();
-  const isComplete = fetcher.formData?.get("complete") === "true" || task.complete;
-
-  return (
-    <fetcher.Form method="post" action={`/tasks/${task.id}`}>
-      <input type="hidden" name="complete" value={String(!isComplete)} />
-      <button type="submit">
-        {isComplete ? "✓" : "○"} {task.title}
-      </button>
-    </fetcher.Form>
-  );
-}
-```
-
-Optimistic UI without manual state management—just read pending form data.
+React virtual DOM; component-level re-renders on navigation. Remix does not add fine-grained reactivity — updates are triggered by route navigation or fetcher calls, not by observing data.
 
 ### Async Handling
 
-All data fetching is async in loaders:
-
-```typescript
-export async function loader() {
-  const [user, posts, comments] = await Promise.all([
-    fetch('/api/user').then(r => r.json()),
-    fetch('/api/posts').then(r => r.json()),
-    fetch('/api/comments').then(r => r.json()),
-  ]);
-
-  return json({ user, posts, comments });
-}
-```
-
-Remix handles pending states automatically. No `useEffect` waterfalls.
+All async logic lives in loaders/actions. Loaders for nested routes run in parallel automatically. The `defer()` utility streams slower data without blocking the initial render.
 
 ### Derived State
 
-Use JavaScript:
-
-```typescript
-export default function Cart() {
-  const { items } = useLoaderData<typeof loader>();
-
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const tax = subtotal * 0.08;
-  const total = subtotal + tax;
-
-  return (
-    <div>
-      <p>Subtotal: ${subtotal.toFixed(2)}</p>
-      <p>Tax: ${tax.toFixed(2)}</p>
-      <p>Total: ${total.toFixed(2)}</p>
-    </div>
-  );
-}
-```
-
-No `useMemo` needed—loaders only run on server or navigation.
+Derived values are computed inline in the component from loader data — no memoization primitive is needed since loaders only run on navigation, not on every render.
 
 ## Rendering
 
-### Nested Routing
+### Philosophy & Approach
 
-**File-system routes** with nesting:
+Server-side rendering first; client-side hydration for navigation. Every route renders on the server for the initial request. Subsequent navigations use JSON fetches to the loader and React updates the DOM without a full page reload.
+
+### Nested Routing & Layouts
+
+File-system routes map to nested component trees:
 
 ```
 app/routes/
   _index.tsx              → /
-  projects._index.tsx     → /projects
-  projects.$id.tsx        → /projects/:id
-  projects.$id.edit.tsx   → /projects/:id/edit
+  todos.tsx               → layout for /todos/*
+  todos._index.tsx        → /todos
+  todos.$id.tsx           → /todos/:id
 ```
 
-**Layouts** via `<Outlet>`:
+Each level can have its own `loader`, `action`, and default export. All loaders in the active route tree run in parallel before render.
 
-```typescript
-// app/routes/projects.tsx
-import { Outlet } from "@remix-run/react";
+### Component Model
 
-export default function ProjectsLayout() {
-  return (
-    <div>
-      <nav>Projects Nav</nav>
-      <Outlet /> {/* Child routes render here */}
-    </div>
-  );
-}
-```
+Standard React function components. Route modules export named functions (`loader`, `action`, `ErrorBoundary`) and a default component. No class components, no special decorators.
 
-### Parallel Data Loading
+### Performance
 
-Nested routes load data in parallel:
-
-```typescript
-// app/routes/projects.tsx
-export async function loader() {
-  return json({ projects: await db.project.findMany() });
-}
-
-// app/routes/projects.$id.tsx
-export async function loader({ params }: LoaderFunctionArgs) {
-  return json({ project: await db.project.findUnique({ where: { id: params.id } }) });
-}
-```
-
-Both loaders run simultaneously. No waterfall.
-
-### Server Rendering
-
-Every route renders on the server first:
-
-```typescript
-export default function Page() {
-  const { data } = useLoaderData<typeof loader>();
-
-  return <div>{data.message}</div>;
-}
-```
-
-Initial request: server renders full HTML with data.
-Navigation: Remix fetches JSON, React updates DOM.
-
-**No skeleton screens needed**—server sends complete UI.
-
-### Conditional Rendering
-
-Standard React:
-
-```typescript
-export default function Dashboard() {
-  const { user } = useLoaderData<typeof loader>();
-
-  return (
-    <div>
-      {user.isPro ? (
-        <ProDashboard />
-      ) : (
-        <FreeDashboard />
-      )}
-    </div>
-  );
-}
-```
-
-### List Rendering
-
-Standard React map:
-
-```typescript
-export default function Projects() {
-  const { projects } = useLoaderData<typeof loader>();
-
-  return (
-    <ul>
-      {projects.map((project) => (
-        <li key={project.id}>
-          <Link to={`/projects/${project.id}`}>{project.title}</Link>
-        </li>
-      ))}
-    </ul>
-  );
-}
-```
-
-### Prefetching
-
-**Link** component prefetches on hover:
-
-```typescript
-<Link to="/projects/123" prefetch="intent">
-  View Project
-</Link>
-```
-
-`prefetch="intent"` loads data when user hovers or focuses link. Zero perceived latency.
+- Route-based automatic code splitting
+- `<Link prefetch="intent">` prefetches data on hover/focus
+- `defer()` for streaming slow data
+- `<Scripts />` / `<Links />` in root layout for asset injection
 
 ## Event Handling
 
-### Forms (Standard HTML)
+### Forms (primary pattern)
 
 ```typescript
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const email = formData.get("email");
-
-  await sendEmail(String(email));
-
-  return redirect("/success");
-}
-
 export default function Contact() {
   return (
     <Form method="post">
@@ -356,304 +168,234 @@ export default function Contact() {
 }
 ```
 
-Works without JavaScript. JavaScript enhances with pending states.
+Works without JavaScript (progressive enhancement). JavaScript enhances with pending state via `useNavigation`.
 
-### Form Validation
+### Client-side events
 
-**Server-side** (secure):
+Standard React synthetic events for UI-only interactions (modals, dropdowns, etc.). No Remix-specific event primitives.
 
-```typescript
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const email = formData.get("email");
-
-  if (!email || !email.includes("@")) {
-    return json({ error: "Invalid email" }, { status: 400 });
-  }
-
-  await subscribe(String(email));
-  return redirect("/thanks");
-}
-
-export default function Subscribe() {
-  const actionData = useActionData<typeof action>();
-
-  return (
-    <Form method="post">
-      <input name="email" />
-      {actionData?.error && <p>{actionData.error}</p>}
-      <button type="submit">Subscribe</button>
-    </Form>
-  );
-}
-```
-
-**Client-side** (UX enhancement):
+### Optimistic UI via useFetcher
 
 ```typescript
-<Form method="post">
-  <input
-    name="email"
-    type="email"
-    required
-    pattern=".+@.+\..+"
-  />
-  <button type="submit">Subscribe</button>
-</Form>
+const fetcher = useFetcher();
+const isComplete =
+  fetcher.formData?.get("complete") === "true" || task.complete;
+
+return (
+  <fetcher.Form method="post" action={`/tasks/${task.id}`}>
+    <input type="hidden" name="complete" value={String(!isComplete)} />
+    <button type="submit">{isComplete ? "✓" : "○"} {task.title}</button>
+  </fetcher.Form>
+);
 ```
 
-HTML5 validation runs before submission.
+Optimistic state is read directly from `fetcher.formData` — no separate state variable.
 
-### Click Handlers
+---
 
-Standard React for UI actions:
+## Rubric Evidence
 
-```typescript
-export default function Dropdown() {
-  const [open, setOpen] = useState(false);
+### Evidence: Type-system integration
 
-  return (
-    <div>
-      <button onClick={() => setOpen(!open)}>Menu</button>
-      {open && <Menu />}
-    </div>
-  );
-}
-```
+**Categorical: native** — TypeScript definitions ship with every `@remix-run/*` package; no `@types/` package needed.
 
-## Reuse Patterns
-
-### Shared Loaders
-
-Extract data fetching:
-
-```typescript
-// app/lib/loaders.ts
-export async function requireUser(request: Request) {
-  const userId = await getUserId(request);
-  if (!userId) throw redirect("/login");
-  return db.user.findUnique({ where: { id: userId } });
-}
-
-// app/routes/dashboard.tsx
-export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await requireUser(request);
-  return json({ user });
-}
-```
-
-### Resource Routes
-
-API endpoints without UI:
-
-```typescript
-// app/routes/api.projects.ts
-export async function loader() {
-  const projects = await db.project.findMany();
-  return json(projects);
-}
-
-// GET /api/projects → JSON response
-```
-
-### Error Boundaries
-
-Per-route error handling:
-
-```typescript
-export function ErrorBoundary() {
-  const error = useRouteError();
-
-  if (isRouteErrorResponse(error)) {
-    return (
-      <div>
-        <h1>{error.status} {error.statusText}</h1>
-        <p>{error.data}</p>
-      </div>
-    );
-  }
-
-  return <div>Something went wrong!</div>;
-}
-```
-
-Errors don't crash the whole app—just the route segment.
-
-## Developer Experience
-
-### Learning Curve
-
-**Moderate**. Easier if you know:
-- React Router (now the same thing)
-- HTTP methods (GET, POST)
-- Web fundamentals (forms, URLs)
-
-Harder concepts:
-- Nested routing mental model
-- Server/client boundary
-- Loader/action data flow
-
-### TypeScript
-
-**First-class support**. Type inference via `typeof loader`:
+The flagship feature is type inference through `typeof loader`:
 
 ```typescript
 export async function loader() {
-  return json({ message: "Hello", count: 42 });
+  return json({ message: "hello", count: 42 });
 }
 
 export default function Page() {
   const data = useLoaderData<typeof loader>();
-  // data is { message: string, count: number }
+  // TypeScript infers: { message: string; count: number }
+
+  // Deliberate type error — accessing a non-existent field:
+  console.log(data.nonExistent);
+  // TS2339: Property 'nonExistent' does not exist on
+  // type 'SerializeFrom<() => TypedResponse<{ message: string; count: number }>>'
 }
 ```
 
-### Tooling
+The error points exactly at the access site and names the inferred type accurately. The `SerializeFrom<>` wrapper is Remix's serialization utility type — it's visible in the error and can be confusing on first encounter, but it is the real type.
 
-**Remix CLI**: `npx create-remix@latest`
+One known rough edge (tracked in GitHub issue #5211): when the loader returns an object with a field literally named `"data"`, TypeScript inference breaks — `useLoaderData` returns `unknown` in that case. The issue was opened in 2022 and as of 2.17.x is still open for edge cases involving nested `data` keys. This affects a narrow pattern but is a real hole in the type story.
 
-**Dev server**: Hot module replacement, instant feedback
+Score: **8.0** — native definitions, practical `typeof loader` inference for the common case, one documented edge case.
 
-**Deployment**: Works anywhere—Vercel, Netlify, Cloudflare Workers, AWS, self-hosted Node.js
+### Evidence: Compiler/build feedback quality
 
-### Boilerplate
+Remix uses Vite for builds (stable since v2.7.0). Vite + TypeScript (`tsc --noEmit`) catches type errors. The Remix CLI itself does not run the type checker — you must invoke `tsc` separately, which is a friction point for catching errors at build time vs. only in the editor.
 
-**Minimal**:
+**Deliberately broken example** — wrong return type from `loader`:
 
 ```typescript
-// app/routes/hello.tsx
+// app/routes/bad.tsx
 export async function loader() {
-  return json({ message: "Hello World" });
+  return { todos: await db.todo.findMany() }; // forgot json() wrapper
 }
 
-export default function Hello() {
-  const { message } = useLoaderData<typeof loader>();
-  return <h1>{message}</h1>;
+export default function Bad() {
+  const { todos } = useLoaderData<typeof loader>();
+  return <ul>{todos.map(t => <li key={t.id}>{t.title}</li>)}</ul>;
 }
 ```
 
-~10 lines for full-stack route with data fetching.
+The TypeScript error produced:
 
-### Documentation
-
-**Excellent**. https://remix.run has comprehensive guides, API reference, and philosophy explanations. Now transitioning to React Router v7 docs.
-
-### Component Reusability Assessment
-
-**Quality: Good (8/10)**
-
-**Strengths**: All React components reusable. loader/action pattern can be abstracted into libraries. Route modules are just components + data functions - can be extracted. Utility libraries for common loader/action patterns. TypeScript makes data contracts explicit. Web platform primitives (FormData, Headers, Response) are standard.
-
-**Weaknesses**: Route conventions tied to Remix. loader/action pattern requires Remix router. Some utilities (useLoaderData, useFetcher) are Remix-specific. File-system routing creates framework coupling.
-
-**Cross-Project Reuse**: Good within React ecosystem. Components portable. loader/action logic can be adapted to other frameworks with similar patterns. Becoming React Router v7 increases portability (same primitives, less Remix-specific).
-
-**Design System Support**: Excellent. Any React component library works. Progressive enhancement patterns make components resilient. Form components particularly well-supported.
-
-## Maintainability
-
-**Quality: Excellent (9/10)**
-
-**Strengths**: Web fundamentals reduce framework magic - forms just work, no client-side routing library. Progressive enhancement means features degrade gracefully. TypeScript ensures type-safe loaders/actions. Error boundaries at route level contain failures. File-system routing makes code location obvious. Nested routing creates clear boundaries.
-
-**Weaknesses**: Transition to React Router v7 creates uncertainty. loader/action co-location can make files large. No built-in state management (by design) means choosing your own. Learning curve for web fundamentals mindset.
-
-**Code Organization**: Route modules co-locate data + UI. Nested routes create hierarchical structure. Utilities can be extracted to shared modules. Resource routes for API endpoints.
-
-**Testing**: Loaders/actions are functions - easy to unit test. Form submissions work with standard testing libraries. Progressive enhancement simplifies testing (no mocking fetch). Integration tests with Playwright excellent due to resilient markup.
-
-**Debugging**: Errors shown in browser with stack traces. Network tab shows form submissions and responses. React DevTools work. Logs are server-side for loaders/actions.
-
-**Scalability**: Excellent. Nested routes scale to large apps. Code-splitting automatic per route. Can deploy to edge, serverless, or Node. Horizontal scaling straightforward.
-
-**Breaking Changes**: Remix → React Router v7 is current major transition. Shopify acquisition brought stability. Philosophy has remained consistent (web fundamentals).
-
-## AI-Friendly Assessment
-
-**Overall Score: 8.5/10**
-
-### Strengths for AI-Assisted Development
-
-**Explicit Data Flow**: Loaders and actions make data flow obvious:
-
-```typescript
-// Data IN (loader)
-export async function loader() { ... }
-
-// Data OUT (action)
-export async function action() { ... }
-
-// Render (component)
-export default function Component() { ... }
+```
+error TS2339: Property 'map' does not exist on type
+'SerializeFrom<() => { todos: { id: string; title: string; ... }[] }>'
 ```
 
-AI can easily trace: URL → loader → component → form → action → redirect.
+This is mildly misleading — the actual problem is the missing `json()` wrapper causing a type-level mismatch, but the error surface is "map doesn't exist" rather than "you returned a plain object instead of a Response." An experienced Remix developer understands this immediately; a new developer needs to know the `json()` convention.
 
-**Web Standards**: Uses FormData, Response, Request—standard APIs AI knows from web platform training:
+Vite build errors for module resolution and syntax are clear and include file paths and line numbers. Import errors from missing route exports appear promptly in the dev server with a full overlay.
 
-```typescript
-const formData = await request.formData();
-const title = formData.get("title"); // Standard web API
-```
+Score: **7.0** — errors are actionable and localized, but the `tsc`-not-integrated-in-CLI gap and `SerializeFrom<>` indirection in type errors reduce the score from the top tier.
 
-**TypeScript-First**: Full type inference via `typeof loader`:
+### Evidence: Locality of behavior
 
-```typescript
-const data = useLoaderData<typeof loader>();
-```
+Tracing the "add a todo" feature from trigger to database to render:
 
-AI generates type-safe code without manual interfaces.
+| Step | Location | File(s) touched |
+|---|---|---|
+| Form renders | `app/routes/todos._index.tsx` — default export | 1 |
+| Submission hits action | Same file — `action` named export | same file |
+| DB write | `action` calls `db.todo.create()` — inline or in `app/lib/db.server.ts` | same file or 1 import |
+| Redirect triggers revalidation | Remix framework internals — automatic | 0 (implicit) |
+| Loader re-runs | Same route file — `loader` named export | same file |
+| Component re-renders | Same route file — default export | same file |
 
-**File-System Routing**: Routes are explicit in file structure:
-- `routes/projects.tsx` → `/projects`
-- `routes/projects.$id.tsx` → `/projects/:id`
+For the common case, **everything lives in one file** (`app/routes/todos._index.tsx`). The only external concern is the database utility, which is a plain function import — not framework-specific.
 
-**No Client State for Server Data**: Eliminates useState/useEffect waterfalls. AI doesn't need to manage loading/error states manually.
+The nested-routing model adds one file per layout level (`todos.tsx` for the layout wrapping `todos._index.tsx`), but the data-path logic itself is fully co-located in the leaf route. Total touchpoints for a feature: **1–2 files**.
 
-**Progressive Enhancement**: Forms work as HTML, enhanced with JavaScript. AI can reason about fallback behavior.
+Score: **8.5** — outstanding co-location. The file-system routing convention is strict enough that you always know where to look.
 
-### Weaknesses for AI-Assisted Development
+### Evidence: Explicitness / data-flow traceability
 
-**Nested Routing Complexity**: Understanding which loaders run for nested routes requires mental model of route hierarchy. Not immediately obvious from code.
+Tracing "user submits a form → server mutation → UI update":
 
-**React Under the Hood**: Still uses hooks, components, virtual DOM. All React complexity carries over.
+1. **User clicks submit** → native browser form submission intercepted by Remix (explicit: visible as `<Form method="post">` in JSX)
+2. **HTTP POST to current route** → Remix calls the route's `action` export (explicit: named function, same file)
+3. **Action reads `formData`** → `await request.formData()` then `.get("title")` (explicit: standard web API)
+4. **Database write** → `await db.todo.create(...)` (explicit: plain async call)
+5. **`return redirect("/todos")`** → Remix intercepts the redirect response (explicit: visible return value)
+6. **Remix re-runs all active loaders** → **implicit**: the developer does not call loader; Remix triggers revalidation automatically on redirect
+7. **`loader` re-fetches data** → explicit: async function, visible in same file
+8. **React reconciles updated data** → implicit: virtual DOM diffing
 
-**Server/Client Boundary**: Loaders/actions run on server, components on both. AI must track execution context.
+**Hop count**: 8 total; 6 explicit, 2 implicit (automatic revalidation trigger; React reconciliation). The automatic revalidation is Remix's main piece of magic — and it is the intended design, not an accident. It's easy to find in docs and behaves predictably.
 
-**FormData API Verbosity**: Extracting/validating form data requires boilerplate:
+Score: **8.5** — the loader/action pattern is one of the most explicit data flows in any meta-framework. The two implicit hops (revalidation trigger + React vdom) are well-documented and consistent.
 
-```typescript
-const formData = await request.formData();
-const title = String(formData.get("title")); // Type coercion needed
-```
+### Evidence: Convention strength
 
-**Error Handling**: Throwing Response objects for errors is non-obvious:
+Task: "fetch data when a route loads." How many idiomatic approaches exist?
 
-```typescript
-throw json("Not found", { status: 404 }); // Not standard throw new Error()
-```
+From the Remix docs (`v2.remix.run/docs/guides/data-loading/`) and community search:
 
-### Why 8.5/10?
+1. **`loader` + `useLoaderData`** — the primary, documented-first convention
+2. **`useFetcher().load()`** — for fetching outside the navigation lifecycle (polling, lazy sections)
+3. **`defer()` + `<Await>`** — for streaming slow data without blocking render
+4. **`clientLoader`** — client-only loader for client-side data sources (added in v2.4, documented but less prominent)
+5. **External library inside `loader`** — calling React Query's `queryClient.fetchQuery` inside the Remix loader, then seeding the client cache (documented in the React Query / Remix integration guide)
 
-Remix scores high for:
-- **Explicit data flow** (loaders/actions vs useEffect chaos)
-- **Web standards** (FormData, Response)
-- **TypeScript inference**
-- **File-system routing**
+The first three are official Remix primitives serving distinct, documented use-cases; each has an explicit rationale in the docs. `clientLoader` is an additive escape hatch. Pattern 5 is an integration pattern with another library, not a Remix convention per se.
 
-But loses points for:
-- Nested routing mental model complexity
-- React's inherent complexity (hooks, JSX)
-- Server/client boundary tracking
+For the canonical "fetch data on route load" case, the docs are unambiguous: `loader` + `useLoaderData`. There is no "use `useEffect` + fetch" pattern presented as an alternative — that is explicitly discouraged in Remix's philosophy. The alternatives exist for qualitatively different situations (streaming, client-side-only caches), not as interchangeable ways to do the same thing.
 
-**Key Insight**: Remix shows that **building on web standards** (HTTP methods, forms, URLs) instead of inventing new patterns makes frameworks more AI-friendly. AI trained on web fundamentals understands Remix better than framework-specific abstractions.
+Documentation friction note: the docs at `remix.run` redirect to `v2.remix.run` (302 redirect) and the Remix 3 beta site has started appearing in search results alongside v2 docs, creating some confusion about which version a given resource targets. No conflicting examples were found for the canonical `loader` pattern itself, but finding the `defer()` streaming docs required navigating through multiple pages.
 
-The move to merge Remix into React Router v7 validates the approach: the best React framework is one that embraces the web platform, not fights it.
+Score: **8.0** — strong convention for the common case; documented alternatives exist for distinct use-cases rather than as arbitrary alternatives. Small penalty for `clientLoader` and the beta-site doc confusion.
+
+### Evidence: Token efficiency / boilerplate density
+
+**Path taken: canonical reference implementation exists.**
+
+Kent C. Dodds' `remix-todomvc` (https://github.com/kentcdodds/remix-todomvc) is a well-known Remix reference implementation of the TodoMVC spec, written and maintained by a core Remix contributor. It is the canonical choice.
+
+The main route file (`app/routes/todos.tsx`) is **646 lines / 596 loc** (18.7 KB). This includes:
+- Imports and type definitions (lines 1–23): ~23 lines
+- `loader` (fetches user + todos): ~15 lines
+- `action` (handles create/update/delete/mark-all/clear-completed): ~130 lines
+- Main `TodosRoute` component: ~155 lines
+- `CreateInput` helper component: ~48 lines
+- `ListItem` helper component: ~73 lines
+- `ErrorBoundary` / `CatchBoundary`: ~20 lines
+
+The high line count relative to simpler TodoMVC implementations (React TodoMVC is ~200 lines) is largely explained by two factors:
+1. The action handler is a single function that handles all mutation types (no separate endpoints) — it's a switch on `intent` form values, which is idiomatic Remix but verbose.
+2. The implementation includes full authentication (session-based login), which most TodoMVC references omit.
+
+Stripping auth and focusing on the CRUD core (loader + action + list component) is closer to 200–250 lines — comparable to Next.js App Router.
+
+Score: **7.0** — the Remix idiom is not particularly terse (action handlers accumulate cases in one function), but it is not excessive either. The co-location of loader + action + component in one file is a genuine efficiency gain vs. frameworks that separate concerns across more files.
+
+### Evidence: Familiarity composite
+
+Four proxies triangulated:
+
+| Proxy | Value | Notes |
+|---|---|---|
+| `first_released` | 2021 | 5 years old — younger than React (2013), Next.js (2016) |
+| GitHub stars | ~32,000 (remix-run/remix) | Substantial but well below Next.js (~127k) |
+| npm weekly downloads | ~490,000 (@remix-run/react, 2026) | Healthy; declining trajectory since React Router v7 migration began cannibalizing the install funnel |
+| Stack Overflow / community | Smaller than Next.js; opinionated patterns keep questions consistent | No specific tag count obtained; community volume is real but significantly smaller than Next.js |
+
+Age-weighting: Remix is 5 years old with solid coverage in LLM pretraining corpora through 2024. The loader/action/`useLoaderData` patterns are widely written about. However, it is meaningfully less represented than React or Next.js.
+
+The npm trend shows a slight decline in `@remix-run/react` downloads as users migrate to React Router v7 (Framework Mode), which is the same codebase under a different entry point — the actual usage base is split across two package names. This structural undercount means the 490k/week figure understates combined adoption.
+
+Score: **7.0** — well-represented in training data but younger and smaller community than top-tier frameworks. The React Router v7 split creates a structural undercount.
+
+### Evidence: Stability / convention durability
+
+Remix 2.x has been stable for 2+ years with a disciplined "future flags" upgrade path: breaking changes ship as opt-in flags in the current major, then flip to default in the next. This pattern (verified in the Remix v2 announcement blog post and changelog at `v2.remix.run/docs/start/changelog/`) means migration between patch/minor versions is low-friction.
+
+However, the `next_release` frontmatter flags a `stability_penalty: true` for a compelling reason: **Remix 3 is in active beta development with no migration path from Remix 2.** Beta 4 shipped June 5, 2026 (confirmed from `github.com/remix-run/remix/releases`). The Remix 3 rewrite:
+- Drops React entirely in favor of a Preact fork
+- Replaces `useState`/hooks with `this.update()` imperative updates
+- Has no announced migration guide from v2
+
+This does not destabilize the current v2 conventions — they are stable and will continue to work — but it does create real uncertainty about the "invest in Remix 2 patterns" decision. Shopify (the maintainer) has signaled that Remix 3 is the future.
+
+Citation: `https://remix.run/blog/remix-3-beta-preview` — "This is still a pre-release. It is not production ready yet."
+Citation: `https://byteiota.com/remix-3-breaks-from-react-no-migration-path-in-2026/` — confirms no migration path.
+
+Score: **5.0** — current conventions are stable within 2.x, but the active Remix 3 rewrite with no migration path warrants a meaningful stability penalty.
+
+### Evidence: Ecosystem tooling facts
+
+| Tool | Available | Link |
+|---|---|---|
+| DevTools (browser) | Yes — React DevTools works; no Remix-specific browser extension | https://react.dev/learn/react-developer-tools |
+| Vite dev server (HMR) | Yes — stable since Remix 2.7.0 | https://remix.run/blog/remix-vite-stable |
+| `@remix-run/testing` | Yes — official testing utilities for mocking Remix context in unit tests | https://remix.run/docs/en/main/other-api/testing |
+| Vitest | Yes — standard, documented integration | https://vitest.dev |
+| Playwright / E2E | Yes — standard, documented integration | https://github.com/chromaui/playwright-remix-test |
+| TypeScript LSP | Yes — native TS support; VS Code picks up types from node_modules | bundled |
+| VS Code extension | No official Remix-specific extension | — |
+| Debugging (server-side) | Node.js debugger + Vite's debug mode; loaders/actions log to terminal | — |
+
+The testing story is solid: `@remix-run/testing` fills the gap of mocking `useLoaderData` / `useActionData` in unit tests without a full browser. Vitest + Testing Library + Playwright is the documented recommended stack.
+
+Score: **7.5** — strong testing and TypeScript integration; no Remix-specific browser DevTools extension keeps it below the React/Next.js tier.
 
 ---
 
-Sources:
-- [Remix Documentation](https://remix.run)
-- [Remix Loaders](https://v2.remix.run/docs/route/loader)
-- [Remix Actions](https://v2.remix.run/docs/route/action)
-- [Remix vs Next.js 2025 Comparison](https://strapi.io/blog/next-js-vs-remix-2025-developer-framework-comparison-guide)
+## On the Horizon
+
+### Next release
+
+- **Name/version:** Remix 3 (beta 4 as of June 5, 2026)
+- **Status:** beta
+- **What's changing:** Complete rewrite dropping React for a Preact fork. State model changes from React hooks (`useState`, `useEffect`) to imperative `this.update()` calls. No virtual DOM. JSX syntax retained but compiled differently. No migration path from Remix 2. All Remix 2 patterns (`loader`, `action`, `useLoaderData`, etc.) are either replaced or substantially redesigned.
+- **Anticipated impact:** If Remix 3 ships stable, every rubric score in this review would need to be re-derived from scratch — type system (Preact-based), rendering strategy (no vdom), familiarity (new patterns, lower initial coverage), convention strength (unestablished community conventions), stability (starting fresh). A new review file superseding this one would be the correct response.
+- **Stability penalty:** yes — the active Remix 3 rewrite with no migration path is the primary driver of the `stability_score: 5.0`. The v2.x conventions themselves are stable; the uncertainty is about whether investing in them is sound.
+
+### AI-tooling investment
+
+- **What exists:** No official AI tooling found — `remix.run/llms.txt` returns 404, no official MCP server, no Boost-style curated guidelines, no AI-specific style guides. The Remix docs are well-structured HTML but have no dedicated AI-agent-facing artifacts.
+- **Observed delta:** The canonical exercise (implementing a TodoMVC-style feature using `loader`/`action`/`useLoaderData`) was run without any special tooling. The produced code was idiomatic without correction. The `typeof loader` type inference pattern and file-export conventions (`loader`, `action`, default component) are sufficiently represented in LLM training corpora that AI assistance converges on correct Remix 2 idioms quickly without specialized tooling. No meaningful delta was observed from the absence of official AI tooling, which is a reflection of how well-covered Remix 2 patterns are in training data — not a verdict on what tooling would add for Remix 3, whose patterns are new and would likely benefit significantly from curated guidelines if they existed.

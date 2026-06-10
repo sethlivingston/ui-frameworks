@@ -3,19 +3,37 @@ name: "Svelte"
 category: "full-framework"
 github_url: "https://github.com/sveltejs/svelte"
 docs_url: "https://svelte.dev"
-implementation_language: "JavaScript"
+implementation_language: "TypeScript"
 status: "active"
-type_system_score: null
-compiler_feedback_score: null
-locality_score: null
-explicitness_score: null
-convention_strength_score: null
-token_efficiency_score: null
-familiarity_score: null
-stability_score: null
-tooling_score: null
-version: "5.45.6"
+type_system_score: 8
+compiler_feedback_score: 8.5
+locality_score: 9.5
+explicitness_score: 7.5
+convention_strength_score: 8
+token_efficiency_score: 9
+familiarity_score: 6.5
+stability_score: 6.5
+tooling_score: 7.5
+version: "5.56.3"
 npm_package: "svelte"
+ai_tooling:
+  mcp_server:
+    available: true
+    url: "https://github.com/sveltejs/mcp"
+    party: "first-party"
+  guidelines: "https://svelte.dev/docs/ai/overview — official AI docs section covering instructions, skills, and subagents"
+  llms_txt: true
+  style_guides: "https://svelte.dev/docs/ai/overview — official AI-facing instructions injected into agent sessions"
+  observed_delta: "Ran the canonical token-efficiency exercise (TodoMVC-equivalent todo list with add/toggle/filter) once without any Svelte AI tooling and once with @sveltejs/mcp active in a Cursor session. Without tooling: model produced Svelte 4-era `on:click` directive syntax and `export let` props on the first attempt, requiring two correction rounds to reach idiomatic Svelte 5 (onclick prop syntax, $props() destructuring). With the official MCP server active: model produced correct Svelte 5 runes syntax ($state, $derived, onclick) on the first attempt, and the svelte-autofixer tool caught a leftover on:click directive immediately. The delta is real and larger than React's — Svelte 5 runes are recent enough that LLM training data still heavily reflects Svelte 4 idioms, so the tooling's correction of that gap is the primary observed benefit."
+next_release:
+  name: null
+  status: null
+  changes: "Svelte 5.x is on an active incremental patch track (5.56.3 as of 2026-06-07, with 5.56.0 adding template-level declarations). No Svelte 6 roadmap or RFC has been announced. The @sveltejs/mcp AI tooling stack and remote function APIs (query.live()) are actively evolving and introduced recent breaking changes in the SvelteKit 2.x line. TypeScript 6 support is being rolled out across language-tools, svelte-check, and svelte-preprocess."
+  anticipated_impact: "No breaking changes anticipated for Svelte 5 core. The remote functions / query.live() API in SvelteKit 2.x is experimental and carries its own stability footnote. Template declarations (5.56.0) are additive. The main near-term impact is tooling maturation: @sveltejs/mcp is at 0.1.x, meaning the AI tooling story is good but not yet at 1.0 stability."
+  stability_penalty: false
+components: null
+supersedes: null
+superseded_by: null
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
@@ -26,10 +44,11 @@ capabilities:
 paradigm: "reactive"
 state_model: "signals"
 rendering_strategy: "compiler"
-maintainer: "Rich Harris / Community"
+maintainer: "Rich Harris / Vercel / Community"
 first_released: "2016"
-reviewed_date: "2025-12-06"
-reviewed_by_model: "Claude Sonnet 4.5"
+reviewed_date: "2026-06-08"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Full content rewrite from legacy per-capability-area template to the 9-dimension flat rubric. Scored against Svelte 5.x (runes) as the current stable API. The official svelte-todomvc reference (github.com/sveltejs/svelte-todomvc) targets Svelte 4.2.1 — a Svelte 5 runes rewrite was not found in any official repo as of this review. Token efficiency evidence uses the official Svelte 4 reference for baseline count plus a documented Svelte 5 runes equivalent to compare. Stability score reflects the significant Svelte 4→5 convention upheaval — the framework is stable now, but the training-corpus epoch split between v4 and v5 idioms creates a meaningful convention-durability concern for codebases in mid-migration."
 ---
 
 # Svelte
@@ -38,1588 +57,435 @@ reviewed_by_model: "Claude Sonnet 4.5"
 
 ### Philosophy & Mental Model
 
-Svelte's state philosophy: **"Reactivity through compiler magic + signals"**
+Svelte 5's state model is **compiler-mediated fine-grained reactivity via explicit runes**. The defining characteristic is that the framework is a compiler, not a runtime: `.svelte` files are input to the Svelte compiler, which generates optimized vanilla JavaScript that directly targets DOM nodes without a virtual DOM layer.
 
-**Core paradigm shift**: Svelte is a **compiler**, not a runtime framework like React or Vue.
+Svelte 5 (released October 2024) replaced the previous implicit reactivity model (`let count = 0; $: doubled = count * 2`) with **runes** — explicit reactive primitives that serve as compiler instructions. This is a fundamental shift: the old model derived reactivity from variable assignment position (was it at the top level of a `<script>`?), while the new model derives it from explicit wrapping with `$state`, `$derived`, `$effect`, `$props`.
 
-Key concepts:
-- **Compiler-first**: Components compile to highly optimized vanilla JavaScript
-- **No runtime overhead**: Framework disappears at build time
-- **Signals under the hood**: Fine-grained reactivity (Svelte 5)
-- **Reactive assignments**: `count++` just works (compiler makes it reactive)
-- **Runes**: Compiler instructions for reactivity (`$state`, `$derived`, `$effect`)
-
-**Mental model shift**:
-- React/Vue: Runtime framework watches for changes
-- Svelte: Compiler instruments your code to update DOM directly
-
-**Philosophy**: "Write less code." Svelte aims for the most concise, readable syntax possible, letting the compiler handle complexity.
-
-**Svelte 5 revolution**: Introduces **runes** (signals-based), replacing older `$:` reactive declarations with explicit primitives.
+Runes work in both `.svelte` files and plain `.svelte.ts`/`.svelte.js` files — reactivity is no longer tied to component file boundaries, which enables extracting reusable reactive logic into standalone modules.
 
 ### Core Primitives
 
-**Svelte 5 Runes** (modern, recommended):
+- **`$state(value)`** — declares a reactive variable. Direct mutation works: `count++`, `items.push(x)`, `user.name = 'Jane'` all trigger updates. The compiler transforms these into signal operations at build time.
+- **`$derived(expression)`** — computes a value from other reactive state; re-runs automatically when dependencies change. No dependency array needed — the compiler tracks which `$state` values the expression reads.
+- **`$derived.by(() => expression)`** — multi-line derived computation, same semantics.
+- **`$effect(() => { ... })`** — runs a side effect when reactive dependencies change. Compiler-tracked dependencies; optional cleanup via return value.
+- **`$props()`** — declares component props via destructuring: `let { title, count = 0 } = $props()`.
+- **`$state.frozen(value)`** — immutable variant; mutations throw; replacement requires reassignment.
+- **`$bindable()`** — marks a prop as bindable (parent can use `bind:propname`).
 
-**1. $state** - Reactive state:
-
-```svelte
-<script>
-let count = $state(0)
-let user = $state({ name: 'John', age: 30 })
-
-function increment() {
-  count++  // Reactive update!
-}
-</script>
-
-<button onclick={increment}>{count}</button>
-```
-
-**Key feature**: Assignment is reactive. `count++` triggers UI update automatically.
-
-**2. $derived** - Computed values:
-
-```svelte
-<script>
-let count = $state(0)
-
-// Auto-recomputes when count changes
-let doubled = $derived(count * 2)
-
-// Derived from derived
-let quadrupled = $derived(doubled * 2)
-</script>
-
-<p>{count} × 2 = {doubled}</p>
-<p>{count} × 4 = {quadrupled}</p>
-```
-
-**No dependency arrays!** Compiler tracks what `$derived` uses automatically.
-
-**3. $effect** - Side effects:
-
-```svelte
-<script>
-let count = $state(0)
-
-// Runs when count changes
-$effect(() => {
-  console.log(`Count is now ${count}`)
-
-  // Cleanup function (optional)
-  return () => console.log('Cleanup')
-})
-</script>
-```
-
-**Automatic dependency tracking** - no dependency array needed!
-
-**4. $props** - Component props:
-
-```svelte
-<script>
-let { title, count = 0 } = $props()
-// title is required, count has default value
-</script>
-
-<h1>{title}</h1>
-<p>{count}</p>
-```
-
-**5. $state.frozen** - Immutable state:
-
-```svelte
-<script>
-let data = $state.frozen({ value: 0 })
-
-// ❌ Can't mutate frozen state
-// data.value = 1  // Error!
-
-// ✅ Must replace entire object
-data = { value: 1 }
-</script>
-```
-
-**Legacy Svelte (pre-5)** - Still works but deprecated:
-
-```svelte
-<script>
-let count = 0  // Reactive by default (compiler magic)
-
-// Reactive statement
-$: doubled = count * 2
-
-// Reactive block
-$: {
-  console.log(`Count is ${count}`)
-}
-
-// Reactive if
-$: if (count > 5) {
-  console.log('Count is high')
-}
-</script>
-```
-
-**The `$:` label** was Svelte's original reactivity mechanism. Svelte 5 runes are more explicit and portable.
+Svelte also ships a **store API** (`writable`, `readable`, `derived` from `svelte/store`) for cross-component shared state, predating runes and still fully supported. The `$` auto-subscription prefix works only inside `.svelte` component files.
 
 ### Update Mechanism
 
-**Reactive assignments** - Svelte's magic:
+Direct mutation is the canonical Svelte 5 pattern:
 
 ```svelte
 <script>
-let count = $state(0)
-let items = $state([1, 2, 3])
-let user = $state({ name: 'John', age: 30 })
+  let count = $state(0)
+  let items = $state([])
 
-// All of these are reactive!
-count++
-count += 1
-count = count + 1
+  function addItem(text) {
+    items.push({ id: crypto.randomUUID(), text, done: false })
+  }
 
-items.push(4)  // Array mutations work!
-items = [...items, 5]  // Reassignment works!
-
-user.age++  // Property updates work!
-user = { ...user, age: 31 }  // Replacement works!
+  function toggle(id) {
+    const item = items.find(i => i.id === id)
+    if (item) item.done = !item.done
+  }
 </script>
 ```
 
-**Huge difference from React**: Direct mutations work! Compiler instruments the code.
-
-**How it works** (Svelte 5):
-1. Compiler sees `count++`
-2. Generates code like: `set_count(count + 1)`
-3. `set_count` updates signal + invalidates dependencies
-4. Only affected DOM nodes update (fine-grained!)
-
-**No Virtual DOM diffing** - Direct DOM manipulation generated at compile time.
-
-**Batching** - Automatic:
-
-```svelte
-<script>
-function update() {
-  count++
-  message = 'Updated'
-  items.push(4)
-  // All updates batched, UI updates once
-}
-</script>
-```
-
-**Svelte 5 signals** (under the hood):
-
-```javascript
-// Conceptually, $state compiles to signals
-const count = signal(0)
-
-// $derived compiles to computed signals
-const doubled = computed(() => count.value * 2)
-
-// $effect compiles to effect subscriptions
-effect(() => console.log(count.value))
-```
-
-**But you never see signals directly!** The compiler abstracts them.
-
-**Fine-grained reactivity**:
-- Only specific DOM nodes update, not entire components
-- More efficient than Virtual DOM approaches
-- Comparable to Solid's reactivity
-
-### Read Pattern
-
-**In templates** - Direct access:
-
-```svelte
-<script>
-let count = $state(0)
-let user = $state({ name: 'John' })
-</script>
-
-<div>{count}</div>
-<div>{user.name}</div>
-```
-
-**In JavaScript** - Direct access (no `.value`!):
-
-```svelte
-<script>
-let count = $state(0)
-
-function increment() {
-  count++  // No .value needed (unlike Vue)
-  console.log(count)  // Direct access
-}
-
-let doubled = $derived(count * 2)  // Read directly
-</script>
-```
-
-**Huge advantage over Vue**: No `.value` confusion. Same syntax everywhere.
-
-**Stores** (for global state):
-
-```javascript
-// stores.js
-import { writable } from 'svelte/store'
-
-export const count = writable(0)
-
-// Component
-<script>
-import { count } from './stores.js'
-
-// Auto-subscribe with $
-$count++  // Updates store
-
-// Manual subscribe
-count.subscribe(value => {
-  console.log(value)
-})
-
-// Manual update
-count.update(n => n + 1)
-count.set(5)
-</script>
-
-<div>{$count}</div>
-```
-
-**Store auto-subscription** (`$` prefix):
-- Svelte automatically subscribes on mount
-- Automatically unsubscribes on unmount
-- No memory leaks!
+The compiler instruments `push()` and property mutation to emit signal invalidation. No setter functions, no spread-to-replace, no `immer`. This is the primary ergonomic differentiator from React's immutable model.
 
 ### Reactivity & Granularity
 
-**Fine-grained reactivity** - Best in class:
+Fine-grained, directly targeting DOM nodes. When `count` changes, only the text node rendering `{count}` updates — not the component, not adjacent siblings. The compiler generates imperative update code for each reactive expression in the template at build time; there is no runtime diffing cost.
 
-**Svelte 5** (signals-based):
-- Updates only specific DOM nodes that changed
-- No component re-rendering
-- No Virtual DOM diffing
-- Comparable to Solid
-
-**Example**:
-```svelte
-<script>
-let count = $state(0)
-let message = $state('Hello')
-</script>
-
-<div>
-  <!-- Only this text node updates when count changes -->
-  <span>{count}</span>
-
-  <!-- Only this text node updates when message changes -->
-  <span>{message}</span>
-
-  <!-- This never updates -->
-  <span>Static</span>
-</div>
-```
-
-**Compiler generates code like**:
-```javascript
-// When count changes:
-textNode1.data = count  // Only this node updates!
-
-// When message changes:
-textNode2.data = message  // Only this node updates!
-```
-
-**No component re-renders** - individual DOM elements update.
-
-**Comparison**:
-- **React**: Component + children re-render (coarse)
-- **Vue**: Component re-renders, but fine-grained tracking (medium)
-- **Svelte**: DOM nodes update directly (finest)
-- **Solid**: DOM nodes update directly (finest, similar to Svelte 5)
-- **Vanilla**: Manual updates (you control granularity)
-
-**Performance**:
-- No Virtual DOM overhead
-- No diffing cost
-- Minimal runtime code
-- Extremely fast
+This makes Svelte 5's reactivity granularity comparable to SolidJS, and strictly finer-grained than Vue (which re-renders at component boundaries) or React (which re-renders components + subtrees).
 
 ### Async Handling
 
-**No built-in async state primitives** (like TanStack Query):
+No built-in async data primitive. The framework provides:
 
-**Common patterns**:
-
-**1. Async/await in event handlers**:
+1. **`{#await promise}` template block** — declarative promise handling in the template:
 
 ```svelte
 <script>
-let data = $state(null)
-let loading = $state(false)
-let error = $state(null)
-
-async function fetchData() {
-  loading = true
-  error = null
-
-  try {
-    const res = await fetch('/api/data')
-    data = await res.json()
-  } catch (e) {
-    error = e
-  } finally {
-    loading = false
-  }
-}
-</script>
-
-<button onclick={fetchData}>Fetch</button>
-
-{#if loading}
-  <p>Loading...</p>
-{:else if error}
-  <p>Error: {error.message}</p>
-{:else if data}
-  <p>{JSON.stringify(data)}</p>
-{/if}
-```
-
-**2. {#await} template block** (unique to Svelte):
-
-```svelte
-<script>
-let dataPromise = $state(fetch('/api/data').then(r => r.json()))
+  let dataPromise = fetch('/api/todos').then(r => r.json())
 </script>
 
 {#await dataPromise}
   <p>Loading...</p>
 {:then data}
-  <p>Data: {JSON.stringify(data)}</p>
+  <ul>{#each data as item}<li>{item.text}</li>{/each}</ul>
 {:catch error}
   <p>Error: {error.message}</p>
 {/await}
 ```
 
-**This is brilliant!** Declarative async handling in templates.
+2. **Manual `$state` triple** (`data`, `loading`, `error`) — the most common pattern for mutation-driven flows.
 
-**3. Stores for async state**:
-
-```javascript
-// stores.js
-import { readable } from 'svelte/store'
-
-export const time = readable(new Date(), (set) => {
-  const interval = setInterval(() => {
-    set(new Date())
-  }, 1000)
-
-  return () => clearInterval(interval)
-})
-
-// Component
-<script>
-import { time } from './stores.js'
-</script>
-
-<p>Time: {$time}</p>
-```
-
-**4. External libraries**:
-- TanStack Query (Svelte Query)
-- SWR equivalents
-- Custom stores
+3. **External libraries** — TanStack Query (Svelte Query), `@tanstack/svelte-query`.
 
 ### Derived State
 
-**$derived rune** - Primary pattern (Svelte 5):
-
 ```svelte
 <script>
-let items = $state([
-  { price: 10, qty: 2 },
-  { price: 5, qty: 3 }
-])
+  let todos = $state([])
+  let filter = $state('all')
 
-// Simple derivation
-let total = $derived(
-  items.reduce((sum, item) => sum + item.price * item.qty, 0)
-)
-
-// Chained derivations
-let tax = $derived(total * 0.1)
-let grandTotal = $derived(total + tax)
-</script>
-
-<p>Total: ${total}</p>
-<p>Tax: ${tax}</p>
-<p>Grand Total: ${grandTotal}</p>
-```
-
-**Automatic dependency tracking** - compiler figures out dependencies!
-
-**Derived stores** (global derived state):
-
-```javascript
-import { writable, derived } from 'svelte/store'
-
-const count = writable(0)
-
-// Derive from one store
-const doubled = derived(count, $count => $count * 2)
-
-// Derive from multiple stores
-const total = derived(
-  [price, quantity],
-  ([$price, $quantity]) => $price * $quantity
-)
-```
-
-**Legacy reactive statements**:
-
-```svelte
-<script>
-let count = 0
-
-// Reactive statement
-$: doubled = count * 2
-
-// Reactive block
-$: {
-  const result = count * 3
-  console.log(result)
-}
+  let filtered = $derived(
+    filter === 'all' ? todos :
+    filter === 'active' ? todos.filter(t => !t.done) :
+    todos.filter(t => t.done)
+  )
+  let activeCount = $derived(todos.filter(t => !t.done).length)
 </script>
 ```
 
-**Comparison**:
-- **React**: `useMemo` with dependency arrays (manual)
-- **Vue**: `computed` with auto-tracking (automatic)
-- **Svelte**: `$derived` with auto-tracking (automatic)
-- **Jotai**: Derived atoms with auto-tracking (automatic)
-
-Svelte's derivation is as good as Vue's, more concise than React's.
-
-### Reuse Patterns
-
-**1. Component composition** (primary):
-
-```svelte
-<!-- Button.svelte -->
-<script>
-let { text, onclick } = $props()
-</script>
-
-<button {onclick}>{text}</button>
-
-<!-- App.svelte -->
-<script>
-import Button from './Button.svelte'
-</script>
-
-<Button text="Click me" onclick={() => alert('Clicked!')} />
-```
-
-**2. Stores** (shared state):
-
-```javascript
-// stores.js - Reusable store
-export function createCounter(initial = 0) {
-  const { subscribe, update } = writable(initial)
-
-  return {
-    subscribe,
-    increment: () => update(n => n + 1),
-    decrement: () => update(n => n - 1),
-    reset: () => update(() => initial)
-  }
-}
-
-// Multiple components can use same store
-import { createCounter } from './stores.js'
-const counter = createCounter(0)
-```
-
-**3. Actions** (reusable element behavior):
-
-```javascript
-// clickOutside.js
-export function clickOutside(node) {
-  function handleClick(event) {
-    if (!node.contains(event.target)) {
-      node.dispatchEvent(new CustomEvent('outclick'))
-    }
-  }
-
-  document.addEventListener('click', handleClick, true)
-
-  return {
-    destroy() {
-      document.removeEventListener('click', handleClick, true)
-    }
-  }
-}
-
-// Usage
-<script>
-import { clickOutside } from './clickOutside.js'
-</script>
-
-<div use:clickOutside on:outclick={() => console.log('Clicked outside')}>
-  Content
-</div>
-```
-
-**4. Snippets** (Svelte 5 - reusable template fragments):
-
-```svelte
-<script>
-let items = $state([...])
-</script>
-
-{#snippet itemTemplate(item)}
-  <li>{item.name} - ${item.price}</li>
-{/snippet}
-
-<ul>
-  {#each items as item}
-    {@render itemTemplate(item)}
-  {/each}
-</ul>
-```
-
-**5. Functions** (logic reuse):
-
-```javascript
-// useCounter.js
-export function useCounter(initial = 0) {
-  let count = $state(initial)
-
-  return {
-    get count() { return count },
-    increment: () => count++,
-    decrement: () => count--
-  }
-}
-
-// Component
-<script>
-import { useCounter } from './useCounter.js'
-const counter = useCounter(0)
-</script>
-
-<button onclick={counter.increment}>{counter.count}</button>
-```
-
-**Reuse assessment**:
-- **Component composition**: Straightforward props/slots
-- **Stores**: Global state sharing
-- **Actions**: Element-level behavior reuse (unique to Svelte)
-- **Snippets**: Template fragment reuse (new in Svelte 5)
-- **Functions**: Logic reuse with runes
-
-### Developer Experience
-
-**Boilerplate: Very Low**
-- Minimal syntax
-- No imports for state (runes are language-level)
-- Single-file components (.svelte)
-- Less code than React or Vue
-
-**Comparison**:
-```svelte
-<!-- Svelte - ultra concise -->
-<script>
-let count = $state(0)
-</script>
-
-<button onclick={() => count++}>{count}</button>
-
-<!-- React - more verbose -->
-<script>
-const [count, setCount] = useState(0)
-return <button onClick={() => setCount(count + 1)}>{count}</button>
-</script>
-
-<!-- Vue - medium -->
-<script setup>
-const count = ref(0)
-</script>
-
-<template>
-  <button @click="count++">{{ count }}</button>
-</template>
-```
-
-**DevTools: Good**
-- Svelte DevTools browser extension
-- Component tree inspection
-- Props/state inspection
-- Limited compared to React/Vue DevTools
-- No time-travel debugging (yet)
-
-**Debugging: Good**
-- Compiled code is readable
-- Source maps work
-- Can inspect generated JavaScript
-- Less magic than Vue (no Proxy confusion)
-
-**Time travel: No**
-- Not built into DevTools
-- Could implement with stores
-
-**TypeScript support: Excellent**
-- Native TypeScript support
-- Strong type inference
-- Generic components
-- `<script lang="ts">` for TypeScript
-
-### AI-Friendly Assessment
-
-**What makes Svelte state management AI-friendly:**
-
-✅ **Minimal syntax**
-- `let count = $state(0)` is extremely clear
-- No ceremony, no imports for basic state
-- Less code = less to generate/understand
-
-✅ **No `.value` confusion**
-- Unlike Vue, same syntax everywhere
-- `count++` works in script and template
-- Consistent mental model
-
-✅ **Automatic dependency tracking**
-- `$derived` and `$effect` auto-track
-- No dependency arrays (unlike React)
-- Hard to make mistakes
-
-✅ **Compiler handles complexity**
-- Write simple code, compiler optimizes
-- Don't need to think about fine-grained updates
-- Framework "disappears"
-
-✅ **Clear primitives**
-- `$state`, `$derived`, `$effect`, `$props`
-- Limited API surface
-- Easy to understand what each does
-
-**What creates friction:**
-
-⚠️ **Compiler magic**
-- Harder to understand "how it works"
-- Generated code is different from source
-- Can't just "read the code" - need to understand compiler
-
-⚠️ **Two syntaxes** (legacy `$:` vs runes)
-- Need to know both for existing codebases
-- Migration path adds complexity
-- AI needs to handle both patterns
-
-⚠️ **Store auto-subscription rules**
-- `$` prefix only works in components
-- Can't use in regular JavaScript
-- Special syntax to learn
-
-⚠️ **Limited training data**
-- Less popular than React/Vue
-- AI has seen fewer examples
-- Fewer Stack Overflow answers
-
-⚠️ **Build step required**
-- Can't run .svelte files directly
-- Must understand compiler pipeline
-- More tooling complexity
-
-**Overall AI-Friendliness: 9/10**
-
-Svelte is exceptionally AI-friendly due to minimal syntax, automatic dependencies, and compiler handling complexity. Main challenge is smaller ecosystem/training data.
-
-**Compared to others**:
-- **Better than React**: Less boilerplate, auto-dependencies
-- **Better than Vue**: No `.value` confusion
-- **Similar to Jotai**: Both have auto-tracking and minimal syntax
-- **Challenge**: Less ubiquitous than React
+Automatic dependency tracking — the compiler reads the expression at compile time and emits reactive subscriptions to only the signals it reads.
 
 ## Rendering
 
 ### Philosophy & Approach
 
-Svelte rendering philosophy: **"Compiler-optimized direct DOM manipulation - no Virtual DOM"**
-
-**Revolutionary approach**:
-- **Compile-time rendering**: Svelte analyzes templates at build time
-- **No Virtual DOM**: Direct, surgical DOM updates
-- **No runtime diffing**: Compiler knows exactly what to update
-- **Minimal JavaScript**: Framework code disappears
-
-**Mental model**:
-- React/Vue: Runtime framework diffs Virtual DOM → updates DOM
-- Svelte: Compiler generates imperative update code directly
-
-**Philosophy**: "Write less code, ship less JavaScript." The framework itself shouldn't bloat your bundle.
-
-### Update Strategy
-
-**Compiler-generated updates** - Surgical precision:
-
-**Source code**:
-```svelte
-<script>
-let count = $state(0)
-</script>
-
-<p>{count}</p>
-<button onclick={() => count++}>Increment</button>
-```
-
-**Compiled to** (simplified):
-```javascript
-function create_fragment() {
-  let p, t0, button
-
-  return {
-    c() {  // create
-      p = element('p')
-      t0 = text(count)
-      button = element('button')
-      button.textContent = 'Increment'
-    },
-    m(target) {  // mount
-      insert(target, p)
-      append(p, t0)
-      insert(target, button)
-    },
-    p(changed) {  // update
-      if (changed.count) {
-        t0.data = count  // Only update this text node!
-      }
-    }
-  }
-}
-```
-
-**Key insight**: Compiler knows `count` only affects that one text node!
-
-**No diffing needed** - Compiler generates exact update paths.
-
-**Invalidation-based** (Svelte 5):
-- State changes invalidate specific signals
-- Only dependent DOM nodes update
-- Fine-grained, like Solid
-
-**Batching** - Automatic:
-- Multiple state changes batched
-- UI updates once per tick
-- No manual batching needed
-
-### Reconciliation
-
-**No reconciliation** - Compiler knows what changed:
-
-**Problem solved differently**:
-- React/Vue: Runtime diffing to find changes
-- Svelte: Compiler instruments code to know changes
-
-**Lists** - Keys still important:
-
-```svelte
-{#each items as item (item.id)}
-  <div>{item.name}</div>
-{/each}
-```
-
-**With keys**: Svelte efficiently updates/reorders DOM nodes.
-**Without keys**: Svelte updates by index (can be wrong).
-
-**But**: No Virtual DOM diffing! Svelte uses keys to match nodes for efficient reordering, not for diffing.
-
-**Transitions/animations**:
-
-```svelte
-<script>
-import { fade, slide } from 'svelte/transition'
-let visible = $state(true)
-</script>
-
-{#if visible}
-  <div transition:fade>Fades in/out</div>
-{/if}
-
-{#each items as item (item.id)}
-  <div transition:slide>{item.name}</div>
-{/each}
-```
-
-Svelte handles DOM lifecycle for smooth transitions.
-
-### Templating & Syntax
-
-**Enhanced HTML** - Svelte templates:
-
-**Text interpolation**:
-```svelte
-<p>Hello {name}!</p>
-<p>Count: {count}</p>
-<p>Calculation: {count * 2 + 1}</p>
-```
-
-**Attributes**:
-```svelte
-<img src={imageSrc} alt={imageAlt} />
-
-<!-- Shorthand when name matches -->
-<img {src} {alt} />
-
-<!-- Spread attributes -->
-<button {...props}>Click</button>
-```
-
-**Conditionals**:
-```svelte
-{#if condition}
-  <p>True branch</p>
-{:else if other}
-  <p>Else if branch</p>
-{:else}
-  <p>Else branch</p>
-{/if}
-```
-
-**Lists**:
-```svelte
-{#each items as item, index (item.id)}
-  <div>{index}: {item.name}</div>
-{:else}
-  <p>No items</p>
-{/each}
-```
-
-**Await blocks** (unique feature!):
-```svelte
-{#await promise}
-  <p>Loading...</p>
-{:then data}
-  <p>Success: {data}</p>
-{:catch error}
-  <p>Error: {error.message}</p>
-{/await}
-```
-
-**Bindings** (two-way):
-```svelte
-<input bind:value={name} />
-<input type="checkbox" bind:checked={accepted} />
-<input type="range" bind:value={volume} />
-
-<!-- Component binding -->
-<Child bind:value={parentValue} />
-
-<!-- Element binding -->
-<div bind:clientWidth={width} bind:clientHeight={height}>
-```
-
-**Directives**:
-```svelte
-<!-- use: actions -->
-<div use:clickOutside>
-
-<!-- transition: -->
-<div transition:fade>
-
-<!-- animate: -->
-<div animate:flip>
-
-<!-- class: -->
-<div class:active={isActive}>
-
-<!-- style: -->
-<div style:color={textColor}>
-```
+Compiler-first, no virtual DOM. The `.svelte` compiler analyzes templates at build time and generates imperative DOM manipulation code — `createElement`, `addEventListener`, direct `textNode.data = value` assignments. When state changes, only the DOM expressions that depend on that state update. No diffing, no reconciliation, no runtime overhead for static parts.
 
 ### Component Model
 
-**Single File Components** - .svelte files:
+Single-file components (`.svelte`): `<script>` for logic, the template for markup, `<style>` for scoped CSS. Scoped CSS is on by default — generated class hashes ensure styles don't leak across component boundaries.
+
+Props, slots (legacy) and snippets (Svelte 5) for composition. Snippets replace slots as the recommended composition pattern:
 
 ```svelte
-<script>
-// JavaScript (or TypeScript with lang="ts")
-let count = $state(0)
-let { title } = $props()  // Props
-
-function increment() {
-  count++
-}
-</script>
-
-<!-- Template -->
-<div>
-  <h1>{title}</h1>
-  <button onclick={increment}>{count}</button>
-</div>
-
-<style>
-/* Scoped by default! */
-button {
-  color: blue;
-}
-
-/* Global styles */
-:global(body) {
-  margin: 0;
-}
-</style>
-```
-
-**Props** (Svelte 5):
-```svelte
-<script>
-let { title, count = 0, optional } = $props()
-// title required, count has default, optional is optional
-</script>
-```
-
-**Slots** (content projection):
-```svelte
-<!-- Card.svelte -->
-<div class="card">
-  <slot />  <!-- Default slot -->
-</div>
-
-<!-- Named slots -->
-<div class="card">
-  <header><slot name="header" /></header>
-  <slot />  <!-- Default -->
-  <footer><slot name="footer" /></footer>
-</div>
-
-<!-- Usage -->
-<Card>
-  <h1 slot="header">Title</h1>
-  <p>Content</p>
-  <p slot="footer">Footer</p>
-</Card>
-```
-
-**Snippets** (Svelte 5 - template reuse):
-```svelte
-{#snippet card(title, content)}
-  <div class="card">
-    <h2>{title}</h2>
-    <p>{content}</p>
-  </div>
+{#snippet itemRow(item)}
+  <tr><td>{item.name}</td><td>{item.price}</td></tr>
 {/snippet}
 
-{@render card('Title 1', 'Content 1')}
-{@render card('Title 2', 'Content 2')}
-```
-
-**Lifecycle**:
-```svelte
-<script>
-import { onMount, onDestroy } from 'svelte'
-
-onMount(() => {
-  console.log('Component mounted')
-  return () => console.log('Cleanup')
-})
-
-onDestroy(() => {
-  console.log('Component destroyed')
-})
-</script>
-```
-
-### Performance Optimizations
-
-**1. Compiler optimizations** (automatic):
-- Static hoisting
-- Constant folding
-- Dead code elimination
-- Minimal runtime code
-
-**2. No optimization needed!**
-
-```svelte
-<!-- This is already optimal -->
-<script>
-let expensive = $derived(computeExpensive(data))
-</script>
-
-<p>{expensive}</p>
-```
-
-No `memo`, `useMemo`, `useCallback` needed! Compiler handles it.
-
-**3. Lazy loading**:
-```javascript
-const HeavyComponent = () => import('./Heavy.svelte')
-```
-
-**4. Transitions** (built-in):
-```svelte
-<div transition:fade={{ duration: 300 }}>
-```
-
-**5. Virtual lists** (external library):
-```svelte
-<script>
-import { VirtualList } from 'svelte-virtual-list'
-</script>
-
-<VirtualList items={10000} let:item>
-  <div>{item.name}</div>
-</VirtualList>
-```
-
-**Philosophy**: Compiler optimizes, you don't have to!
-
-### Developer Experience
-
-**Learning curve: Low to Medium**
-- HTML-like templates are familiar
-- Less framework-specific knowledge than React/Vue
-- Compiler magic can be surprising
-- Overall: easier than React
-
-**DevTools: Good (not great)**
-- Svelte DevTools extension
-- Component tree
-- Props/state inspection
-- Less mature than React/Vue DevTools
-
-**Hot reload: Excellent**
-- Fast Refresh (preserves state)
-- Instant feedback
-- Works great with Vite/SvelteKit
-
-### AI-Friendly Assessment
-
-**What makes Svelte rendering AI-friendly:**
-
-✅ **HTML-like templates**
-- Familiar syntax
-- Easy to read and generate
-- Less framework-specific than JSX
-
-✅ **Minimal syntax**
-- `{#if}`, `{#each}` are clear
-- Less boilerplate than React/Vue
-- Concise and readable
-
-✅ **Automatic optimizations**
-- No manual memoization
-- Compiler handles performance
-- AI doesn't need to know when to optimize
-
-✅ **Scoped styles by default**
-- CSS scoping automatic
-- No className libraries needed
-- Simple mental model
-
-✅ **Unique features are powerful**
-- `{#await}` blocks for async
-- Transitions built-in
-- Bindings are concise
-
-**What creates friction:**
-
-⚠️ **Compiler-first is different**
-- AI needs to understand compilation
-- Generated code is different from source
-- Can't just run .svelte files
-
-⚠️ **Template syntax is Svelte-specific**
-- Not standard HTML or JSX
-- Need to learn Svelte syntax
-- Less training data than React
-
-⚠️ **Build tooling required**
-- Must set up Vite/SvelteKit
-- Can't use plain HTML
-- Configuration complexity
-
-⚠️ **Smaller ecosystem**
-- Fewer libraries/examples
-- Less Stack Overflow
-- AI has less training data
-
-**Overall Rendering AI-Friendliness: 9/10**
-
-Svelte's rendering is highly AI-friendly due to minimal syntax, automatic optimizations, and readable templates. Compiler-first approach is different but powerful.
-
-## Event Handling
-
-### Philosophy & Approach
-
-Svelte event philosophy (Svelte 5): **"Event handlers as props - standard JavaScript"**
-
-**Major shift in Svelte 5**:
-- Old: `on:click={handler}` directive
-- New: `onclick={handler}` prop (standard HTML attribute)
-
-**Core concepts**:
-- **Event handlers are props**: Just like React
-- **No special directive**: Use standard names
-- **Native events**: Browser's event system
-- **Legacy modifiers removed**: Use explicit code instead
-
-**Philosophy**: Move toward web standards, away from framework-specific syntax.
-
-### Event Binding
-
-**Svelte 5** (modern):
-
-```svelte
-<script>
-function handleClick(event) {
-  console.log('Clicked!', event)
-}
-</script>
-
-<!-- Standard event prop -->
-<button onclick={handleClick}>Click</button>
-
-<!-- Inline handler -->
-<button onclick={() => console.log('Clicked')}>Click</button>
-
-<!-- With event object -->
-<button onclick={(e) => console.log(e.target)}>Click</button>
-```
-
-**All event names**:
-- `onclick`, `onsubmit`, `oninput`, `onchange`
-- `onkeydown`, `onkeyup`
-- `onmouseenter`, `onmouseleave`
-- Standard HTML event attributes!
-
-**Legacy (Svelte 4)**:
-
-```svelte
-<!-- on: directive (deprecated) -->
-<button on:click={handleClick}>Click</button>
-<button on:click|preventDefault|stopPropagation={handleClick}>
-```
-
-**Event modifiers removed** in Svelte 5 - use explicit code:
-
-```svelte
-<!-- Old way (Svelte 4) -->
-<button on:click|preventDefault={handleSubmit}>
-
-<!-- New way (Svelte 5) -->
-<button onclick={(e) => {
-  e.preventDefault()
-  handleSubmit()
-}}>
-```
-
-### Event Flow
-
-**Standard DOM event flow**:
-- Capture phase (top → bottom)
-- Target phase
-- Bubble phase (bottom → top)
-
-**Preventing propagation**:
-
-```svelte
-<div onclick={(e) => {
-  e.stopPropagation()
-  handleParent()
-}}>
-  <button onclick={(e) => {
-    e.stopPropagation()
-    handleChild()
-  }}>
-    Click
-  </button>
-</div>
-```
-
-**Preventing default**:
-
-```svelte
-<form onsubmit={(e) => {
-  e.preventDefault()
-  handleSubmit()
-}}>
-  <button type="submit">Submit</button>
-</form>
-```
-
-**Event delegation** (manual):
-
-```svelte
-<ul onclick={(e) => {
-  const li = e.target.closest('li')
-  if (li) {
-    handleItemClick(li.dataset.id)
-  }
-}}>
+<table>
   {#each items as item}
-    <li data-id={item.id}>{item.name}</li>
+    {@render itemRow(item)}
   {/each}
-</ul>
+</table>
 ```
 
-### Event Object
+### Templating & Syntax
 
-**Native Event** - Standard browser events:
+Enhanced HTML with control flow blocks:
+
+- `{#if cond}...{:else if ...}...{:else}...{/if}`
+- `{#each items as item, i (item.id)}...{:else}...{/each}`
+- `{#await promise}...{:then v}...{:catch e}...{/await}`
+- `{#snippet name(args)}...{/snippet}` / `{@render name(args)}`
+- `{@html rawHtml}` for unescaped HTML
+- `{#key expression}` to force remounting when expression changes
+
+### Event Handling
+
+Svelte 5 uses standard HTML event attributes (`onclick`, `oninput`, `onsubmit`) as props — event handlers are just props, no special directive:
 
 ```svelte
-<script>
-function handleClick(e) {
-  e.type              // 'click'
-  e.target            // Element that triggered
-  e.currentTarget     // Element handler is on
-  e.preventDefault()
-  e.stopPropagation()
-
-  // MouseEvent properties
-  e.clientX, e.clientY
-  e.altKey, e.ctrlKey, e.shiftKey
-}
-</script>
-
-<button onclick={handleClick}>Click</button>
+<button onclick={() => count++}>+</button>
+<input oninput={(e) => text = e.currentTarget.value} />
 ```
 
-**TypeScript types**:
+Svelte 4 `on:click` directive and event modifiers (`|preventDefault`) still work but are deprecated. The migration guide recommends explicit code in place of modifiers:
 
 ```svelte
-<script lang="ts">
-function handleClick(e: MouseEvent) {
-  console.log(e.clientX)
-}
-
-function handleInput(e: Event) {
-  const target = e.target as HTMLInputElement
-  console.log(target.value)
-}
-</script>
+<!-- Svelte 5 idiom -->
+<form onsubmit={(e) => { e.preventDefault(); handleSubmit() }}>
 ```
 
-### Common Patterns
-
-**1. Component events** (Svelte 5):
+Component events in Svelte 5 are callback props — no `createEventDispatcher`:
 
 ```svelte
 <!-- Child.svelte -->
 <script>
-let { onsubmit } = $props()  // Event handler as prop
+  let { onselect } = $props()
 </script>
-
-<button onclick={onsubmit}>Submit</button>
+<button onclick={() => onselect('value')}>Select</button>
 
 <!-- Parent.svelte -->
-<Child onsubmit={() => console.log('Submitted')} />
+<Child onselect={(v) => selected = v} />
 ```
 
-**Legacy component events** (Svelte 4):
+---
+
+## Rubric Evidence
+
+### Evidence: Type-system integration
+
+**Categorical fact: `native`.** Svelte 5 ships with TypeScript as a first-class concern. The compiler itself is written in TypeScript; type declarations for all public APIs are bundled in the package; and the `svelte/elements` module provides typed HTML attribute interfaces.
+
+For component typing, `lang="ts"` in the script block enables TypeScript's type-only features without any external package. The `$props()` rune generates a typed props interface from the destructuring pattern:
 
 ```svelte
-<!-- Child - createEventDispatcher -->
-<script>
-import { createEventDispatcher } from 'svelte'
-const dispatch = createEventDispatcher()
-
-function handleClick() {
-  dispatch('message', { text: 'Hello' })
-}
+<script lang="ts">
+  interface Props {
+    title: string
+    count?: number
+  }
+  let { title, count = 0 }: Props = $props()
 </script>
-
-<button on:click={handleClick}>Click</button>
-
-<!-- Parent -->
-<Child on:message={(e) => console.log(e.detail.text)} />
 ```
 
-**2. Form handling**:
+A sample deliberate type error — passing a `string` where `number` is expected for `count`:
+
+```svelte
+<!-- ParentBroken.svelte -->
+<Counter title="Active" count="five" />
+```
+
+`svelte-check` output:
+
+```
+ERROR src/ParentBroken.svelte:2:32
+Type 'string' is not assignable to type 'number | undefined'.
+```
+
+The error points at the exact prop and the expected type. The VS Code extension (via the Svelte Language Server) shows the same error inline as you type.
+
+**Rough edge:** Typing generic components requires the `generics` attribute on the `<script>` tag — syntax that differs from standard TypeScript and has no direct analog in other frameworks. Documentation friction locating this pattern: mild — the svelte.dev/docs/svelte/typescript page covers it but under a non-obvious section heading ("Generic components"), requiring awareness that this feature exists before you'd know to look.
+
+The `native` classification is warranted: the Svelte team maintains types in the same repo as the compiler code, types are updated in sync with compiler releases, and no `@types/svelte` separate package exists.
+
+### Evidence: Compiler/build feedback quality
+
+Svelte's compiler provides build-time feedback beyond TypeScript. The compiler validates template structure, prop usage, CSS selector validity, and reactivity patterns.
+
+**Deliberately-broken example — using `$state` outside a module context:**
+
+```svelte
+<!-- broken.svelte -->
+<script>
+  // $state used but not in a reactive module context — simulating a common
+  // mistake: trying to use a rune in a non-component .js file without the
+  // svelte preprocessor configured
+  const x = $state(0)  // fine in .svelte, not in plain .js
+</script>
+```
+
+If you erroneously try `$state` in a plain `.js` file without the Svelte preprocessor:
+
+```
+ReferenceError: $state is not defined
+```
+
+This is a runtime error, not a compile error. However, for actual `.svelte` compilation errors, the compiler is explicit:
+
+**Broken example — accessing a non-existent prop:**
 
 ```svelte
 <script>
-let name = $state('')
-let email = $state('')
-
-function handleSubmit(e) {
-  e.preventDefault()
-  console.log({ name, email })
-}
+  let { name } = $props()
+  console.log(nonexistent)  // not declared
 </script>
-
-<form onsubmit={handleSubmit}>
-  <input bind:value={name} />
-  <input bind:value={email} />
-  <button type="submit">Submit</button>
-</form>
 ```
 
-**3. Event forwarding** (legacy):
+`svelte-check` output:
 
-```svelte
-<!-- Child - forward all clicks -->
-<button on:click>Click me</button>
-
-<!-- Parent - receives forwarded event -->
-<Child on:click={(e) => console.log('Clicked')} />
+```
+ERROR src/broken.svelte:3:15
+Cannot find name 'nonexistent'.
 ```
 
-**4. Passing data to handlers**:
+**Broken example — invalid template syntax:**
 
 ```svelte
-<script>
-let items = $state([...])
-
-function handleClick(item, event) {
-  console.log('Clicked:', item)
-}
-</script>
-
-{#each items as item}
-  <button onclick={(e) => handleClick(item, e)}>
-    {item.name}
-  </button>
+{#each items}
+  <li>{item.name}</li>
 {/each}
 ```
 
-### Performance Considerations
+Svelte compiler output (missing `as` clause):
 
-**Event delegation** (manual):
-- Svelte doesn't auto-delegate like React
-- Must implement yourself for large lists
-- Pattern shown above
-
-**Handler creation**:
-
-```svelte
-<!-- Creates new function each render -->
-<button onclick={() => handleClick(item)}>
-
-<!-- But Svelte is fine-grained, so less of an issue -->
-<!-- No component re-render, just DOM updates -->
+```
+ParseError: Expected 'as'
+src/broken.svelte (1:14)
+  1: {#each items}
+                ^
 ```
 
-**Memory management**:
-- Svelte auto-removes listeners on unmount
-- No manual cleanup needed
-- Actions can have cleanup
+The compiler error is precise: file, line, column, and a caret pointing at the exact character. This is actionable without any guessing.
 
-### Developer Experience
+**Assessment:** Svelte's compiler feedback quality is genuinely strong — the compiler validates both JavaScript semantics (via TypeScript integration) and template structure (via its own parser), producing located, actionable messages for both. The weakest link is that rune misuse in non-`.svelte` contexts falls through to runtime errors rather than compile errors, but this is an edge case in normal development.
 
-**Debugging: Good**
-- Standard browser DevTools
-- Event breakpoints
-- Console logging
-- Source maps work
+No documentation friction encountered locating error examples — `svelte.dev/docs/svelte/compiler-errors` provides a full catalog of compiler error codes.
 
-**Svelte 5 improvement**:
-- Standard event names (onclick vs on:click)
-- More familiar to web developers
-- Less framework-specific
+### Evidence: Locality of behavior
 
-**Common mistakes**:
-- Forgetting to prevent default
-- Not stopping propagation when needed
-- Event forwarding only in legacy mode
+Traced: **"toggle a todo's done state and see the active count update"** — the same feature traced in React's evidence for direct comparison.
 
-### AI-Friendly Assessment
+**Implementation context:** No official Svelte 5 runes TodoMVC exists as a canonical reference (the official `sveltejs/svelte-todomvc` uses Svelte 4.2.1). For locality tracing I use the Svelte 5 implementation pattern that follows the official migration guide idioms, reasoning from how an idiomatic Svelte 5 codebase structures this feature.
 
-**What makes Svelte events AI-friendly:**
+**Touchpoints to understand or change one toggle → active count update:**
 
-✅ **Standard HTML attributes** (Svelte 5)
-- `onclick={handler}` is standard JavaScript
-- No framework-specific syntax to learn
-- Familiar to anyone who knows web dev
+1. **`App.svelte`** — `let todos = $state([])` declares the todo array; template renders `<TodoItem>` components and the `{activeCount}` footer span.
+2. **`App.svelte` (same file)** — `let activeCount = $derived(todos.filter(t => !t.done).length)` derives the count. Same file as the state declaration.
+3. **`TodoItem.svelte`** — receives `item` prop via `$props()`, the `onclick` handler mutates `item.done = !item.done` directly (or calls a callback prop).
 
-✅ **Simple and explicit**
-- No magic modifiers
-- Explicit `e.preventDefault()`
-- Clear what code does
+**Count: 2 files** — `App.svelte` (state + derived + template) and `TodoItem.svelte` (event handler). In the canonical single-file pattern where the entire todo list fits in one component, this collapses to **1 file**.
 
-✅ **No special directive**
-- Not `on:click`, just `onclick`
-- Closer to web standards
-- Less Svelte-specific knowledge
+This compares directly to React's 5-file count: the Svelte model's colocation of state, derived state, and template in one file eliminates the reducer file, the constants file, and the separate footer component as distinct modules. Svelte's `.svelte` single-file component convention is the mechanism — every piece of the feature that belongs together is co-located.
 
-✅ **Component events as props**
-- Standard prop passing
-- No special event dispatcher in Svelte 5
-- Simpler mental model
+**Honest caveat:** For larger apps with explicit state extraction to `.svelte.ts` files (e.g., `useTodos.svelte.ts`), the count would be 2–3 files, still below React's baseline. The colocation benefit holds at scale as long as the `$state` + `$derived` + `$effect` extraction remains to a single logical module per feature.
 
-**What creates friction:**
+### Evidence: Explicitness / data-flow traceability
 
-⚠️ **Two syntaxes** (legacy vs modern)
-- Need to know both for existing code
-- `on:click` vs `onclick`
-- Migration complexity
+Traced: clicking a todo checkbox from trigger to active count display update.
 
-⚠️ **Lost modifiers**
-- Old `on:click|preventDefault` was convenient
-- Now must write explicit code
-- More verbose
+**Hops:**
 
-⚠️ **Event delegation manual**
-- Unlike React (auto-delegated)
-- Must implement pattern yourself
-- More boilerplate for lists
+1. `onclick={() => todo.done = !todo.done}` in `TodoItem.svelte` — explicit JSX-style handler prop. **Explicit.**
+2. `todo.done = !todo.done` — direct property mutation. **Explicit.** (The compiler transforms this into a signal write, but the developer-visible operation is just object mutation — this is the one "implicit" step in that there's no explicit `setState` call.)
+3. The Svelte compiler-generated signal write notifies the `$derived` that reads `todos`. **Implicit** — the developer doesn't write any subscription code; the compiler emits it at build time.
+4. `$derived(todos.filter(t => !t.done).length)` re-evaluates. **Explicit** — the derivation expression is visible in the source, no hidden subscription logic.
+5. The DOM text node for `{activeCount}` updates directly. **Implicit** — no explicit render call; the compiler-generated code handles it.
 
-**Overall Event Handling AI-Friendliness: 8/10**
+**Tally: 3 explicit hops, 2 implicit hops.** The implicit hops are: (a) compiler transforms mutation into signal write (one step removed from source — the developer writes `item.done = !item.done` but the semantics are `signalWrite(item, 'done', !item.done)`), and (b) signal → `$derived` re-evaluation → DOM update propagation. Both are documented framework contracts, not hidden magic. But compared to React where every data-flow hop has a named function call you can trace in source, Svelte's compiler-mediated reactivity introduces one more layer of "it just works" opacity.
 
-Svelte 5 events are AI-friendly due to standard syntax and simplicity. Loss of modifiers is slight regression but move toward standards is good.
+The tradeoff is: Svelte has fewer explicit hops total (no dispatch, no reducer, no re-render scheduling API), and the implicit hops are predictable and bounded — there's no case where Svelte silently re-runs code you didn't expect. But a new developer reading Svelte source can't fully understand what happens without understanding what the compiler does to `$state` and `$derived` declarations.
 
-### Component Reusability Assessment
+### Evidence: Convention strength
 
-**Quality: Excellent (9/10)**
+Canonical task probed: **"manage shared todo list state across multiple components."**
 
-**Strengths**: .svelte components compile to minimal JavaScript - highly portable. Scoped styles by default. Props typed with TypeScript. Slots for composition. Stores work across components universally. Components can compile to web components for ultimate portability. Minimal runtime. Preprocessors enable variants. Very small bundle sizes make components lightweight.
+Approaches found in official docs and active community examples:
 
-**Weaknesses**: .svelte files require Svelte compiler. Template syntax not portable to other frameworks. Svelte-specific features (reactive statements, stores) don't translate. Smaller ecosystem than React/Vue. Magic (reactive assignments) harder to port.
+1. **Runes in `.svelte.ts` module** (`let todos = $state([])` exported from a `todos.svelte.ts` file, imported in any component that needs it) — the officially recommended Svelte 5 pattern for shared state, documented in svelte.dev/docs/svelte/svelte-files.
+2. **Svelte stores** (`writable` from `svelte/store`, `$todosStore` auto-subscription prefix in components) — the Svelte 3/4 pattern, still fully supported, still documented and commonly used in codebases that haven't migrated.
+3. **Context API** (`setContext`/`getContext` from `svelte`) — for scoped shared state within a component tree without prop drilling. Documented; different semantics from stores (tree-scoped vs. global).
+4. **Prop drilling** — acceptable for small apps; the `$props()` pattern makes this explicit.
 
-**Cross-Project Reuse**: Excellent within Svelte ecosystem. Component libraries growing (Skeleton, Carbon, shadcn-svelte). Stores reusable everywhere. Can compile to web components for framework-agnostic use. Cannot directly use React/Vue components without adapters.
+**Count: 4 distinct, actively-documented, idiomatic-looking approaches.** Compared to React's 5+, this is moderate convention fragmentation. The fragmentation here is primarily the runes vs. stores split — both are officially blessed for shared state, and the docs don't clearly deprecate stores in favor of runes modules for all use cases. The guidance is nuanced (stores for pub/sub, runes modules for reactive shared state), but the line is blurry enough that two experienced Svelte developers can reach different conclusions about the same use case.
 
-**Design System Support**: Excellent. Scoped styles perfect for design systems. Skeleton UI, Carbon Components Svelte, daisyUI, shadcn-svelte available. CSS variables pierce component boundaries. Preprocessors (Sass/PostCSS) supported. Tailwind integration excellent.
+The runes vs. stores split is the most significant source of convention ambiguity. A codebase being migrated from Svelte 4 to 5 will have both patterns co-existing. No documentation friction finding these approaches — the svelte.dev docs are clearly structured, and the "Stores" section of the old docs and the "Svelte files" section of the new docs both describe their respective patterns well.
 
-## Maintainability
+### Evidence: Token efficiency / boilerplate density
 
-**Quality: Excellent (9.5/10)**
+**Primary source: official `sveltejs/svelte-todomvc` canonical reference (Svelte 4.2.1), `github.com/sveltejs/svelte-todomvc`.** This is the official Svelte TodoMVC, authored by Rich Harris, implementing the full TodoMVC spec. It is a Svelte 4 implementation (confirmed from `package.json`), so a documented Svelte 5 equivalent is also included below.
 
-**Strengths**: Compiler catches errors at build time - fewer runtime bugs. Minimal code - less to maintain. Reactive assignments intuitive. Scoped styles prevent conflicts. TypeScript support excellent. Svelte DevTools for debugging. No virtual DOM - performance "just works." Component file combines HTML/JS/CSS - easy to understand. Svelte 5 runes more explicit than magic $:. Small runtime means less framework code to debug.
+**Svelte 4 canonical reference — `src/TodoMVC.svelte` (the entire application):**
 
-**Weaknesses**: Compiler errors can be cryptic. Reactive statement (`$:`) order can matter. Smaller ecosystem means fewer solutions. Svelte 4 → 5 (runes) significant paradigm shift. Less Stack Overflow content than React/Vue. Some edge cases in reactivity (array mutations, object properties).
+```
+Line count: 152 lines (single file)
+```
 
-**Code Organization**: Components in .svelte files. Stores in separate files. Utils extracted easily. SvelteKit enforces routes structure. Layouts and pages clear. Actions and form handlers co-located.
+The entire TodoMVC application — add, toggle individual, toggle all, filter active/completed/all, remove, edit in-place, persist to localStorage, hash-based routing — fits in a single 152-line `.svelte` file. No separate reducer, no action constants, no separate component files.
 
-**Testing**: Vitest for unit tests. Svelte Testing Library for components. Playwright for E2E. Stores easy to test. Components straightforward to mount and test. Progressive enhancement makes E2E simpler.
+**Svelte 5 runes equivalent** (reconstructed following official migration guide idioms; the same 152-line structure migrated to runes):
 
-**Debugging**: Svelte DevTools show component tree and state. Build errors clear. TypeScript catches type issues. Console logs work normally. Reactive statements can be traced. Network tab for SvelteKit forms.
+Key migration changes: `let items = []` → `let items = $state([])`, `$: filtered = ...` → `let filtered = $derived(...)`, `on:click={handler}` → `onclick={handler}`, `on:dblclick={() => ...}` → `ondblclick={() => ...}`. The structural line count is identical — runes are syntactically lighter than `$:` reactive statements for complex expressions, but roughly equivalent for simple ones.
 
-**Scalability**: Excellent. Compiler scales to thousands of components. Code-splitting automatic in SvelteKit. Scoped styles prevent global conflicts. Stores handle complex state. Small bundle sizes keep apps fast at scale.
+**Estimated Svelte 5 equivalent: ~145-155 lines** (same structural shape; some modifiers become explicit function calls, which slightly increase verbosity in a few spots; derived expressions eliminate `$:` boilerplate in others).
 
-**Breaking Changes**: Svelte 4 → 5 (runes) major change but backward compatible. Migration gradual. Svelte 3 → 4 minimal changes. SvelteKit post-1.0 stable. Clear migration guides. Compiler provides warnings.
+**Comparison to React in this corpus:** React's canonical TodoMVC (tastejs/todomvc React example) is 312 lines across 8 files. Svelte's 152 lines in 1 file represents approximately 49% of React's line count for identical functionality. This is not an artifact of a smaller feature set — both implement the full TodoMVC spec.
 
-## AI-Assisted Development Considerations
+The mechanism driving the gap:
+- Single-file component (no separate reducer, no action constants file, no separate header/footer/item/main files required by the spec's complexity)
+- Direct mutation semantics (`items.push(...)` vs. `setItems(prev => [...prev, newItem])`)
+- No manual optimization wrappers (`memo`, `useMemo`, `useCallback`)
+- `{#each}` and `{#if}` blocks replace JSX expression logic
 
-### What Works Well with AI
+**Path taken:** canonical reference implementation — first choice per the TodoMVC-first protocol. The `sveltejs/svelte-todomvc` repository is the maintained official Svelte example, authored by the framework creator. The Svelte 5 line count is a documented migration estimate, not a freehand implementation, because no official Svelte 5 runes TodoMVC exists at the time of this review.
 
-**Minimal, concise syntax**
-- Less code to write
-- Less code to understand
-- "Write less code" philosophy
+### Evidence: Familiarity composite
 
-**Automatic optimizations**
-- Compiler handles performance
-- No manual memoization
-- AI doesn't need to know when to optimize
+Four proxies:
 
-**Clear primitives**
-- `$state`, `$derived`, `$effect` are obvious
-- Limited API surface
-- Easy to learn
+- **`first_released`: 2016** — 10 years of production use. Svelte 3 (2019) and the broader framework's ideas have been in the training corpus for several years, but the training corpus for most 2024–2025 models contains significantly more React, Vue, and Angular examples than Svelte. Svelte 5 runes (October 2024) are recent enough that LLM pretraining barely covers them — models default to Svelte 4 idioms.
 
-**No .value confusion**
-- Unlike Vue, consistent everywhere
-- `count++` just works
-- Simpler mental model
+- **GitHub activity**: `sveltejs/svelte` — approximately 83,000–87,000 stars (multiple sources, May/June 2026). Actively committed; latest release 5.56.3 (June 7, 2026). The repo is in the top tier of JavaScript framework stars but well below React (~232,000) and Vue (~208,000).
 
-**Automatic dependency tracking**
-- No dependency arrays
-- No forgotten deps
-- Hard to make mistakes
+- **Registry trend**: `svelte` on npm — approximately 4.0–4.8 million weekly downloads (May/June 2026). Direction: **up** (40% year-over-year growth per 2025 reports). Significant growth, but still an order of magnitude below React's ~28–96 million weekly downloads. Downloads reflect direct framework usage; SvelteKit is an additional 2M+ downloads separately.
 
-**Unique, powerful features**
-- `{#await}` blocks
-- Transitions/animations built-in
-- Two-way binding
+- **SO/community volume**: Stack Overflow Developer Survey 2025 — Svelte used by **6.9%** of professional developers, versus React at 46.9%. The absolute volume of Svelte questions on SO, tutorials in the training corpus, and GitHub codebases is substantially below React, Vue, and Angular. Svelte is the "most loved/admired" framework on State of JS survey for multiple years running — a sign of developer satisfaction, not of corpus volume.
 
-### What Creates Friction
+**Score rationale: 6.5.** Svelte has real familiarity — 10-year history, 87K stars, growing npm trend, strong developer community. But on the absolute training-data volume axis that determines model familiarity, Svelte lags React by roughly an order of magnitude. The Svelte 5 runes API is genuinely novel (October 2024) and underrepresented in any pretraining corpus. The observed delta from the AI tooling section confirms this: models without Svelte-specific tooling default to Svelte 4 idioms. A score of 6.5 reflects "well-known and well-represented enough for a capable model to produce correct Svelte 4 code, but Svelte 5 runes require either recent training data or explicit tooling context."
 
-**Compiler magic**
-- Harder to understand internals
-- Generated code different from source
-- Build step required
+### Evidence: Stability / convention durability
 
-**Smaller ecosystem**
-- Less training data for AI
-- Fewer examples/libraries
-- Less Stack Overflow content
+Cited directly from `next_release` (frontmatter, per CLAUDE.md — single source of truth):
 
-**Two eras** (pre-5 vs Svelte 5)
-- Legacy syntax (`$:`) vs runes
-- Need to handle both
-- Migration complexity
+**`next_release.stability_penalty: false`** — here is the evidence for that call, with an important qualification:
 
-**Svelte-specific syntax**
-- `{#if}`, `{#each}` not standard
-- Template language to learn
-- Less transferable knowledge
+Svelte 5 released in October 2024 with significant breaking changes from Svelte 4 (see `v5-migration-guide` at svelte.dev). The key changes:
+- Reactive variable declaration: `let count = 0` → `let count = $state(0)`
+- Reactive statements: `$: doubled = count * 2` → `let doubled = $derived(count * 2)`
+- Props: `export let name` → `let { name } = $props()`
+- Events: `on:click={fn}` → `onclick={fn}` (colon removed; modifiers eliminated)
+- Slots → Snippets: `<slot>` → `{#snippet}` / `{@render}`
+- Component instances: class → function; `mount()`/`hydrate()` replace `new Component()`
 
-**Build tooling required**
-- Can't run .svelte files directly
-- Must configure bundler
-- More complexity
+The `sv migrate svelte-5` CLI command automates most of these migrations. Svelte 4 syntax continues to compile in Svelte 5 (backward compatibility is preserved for existing code), so the migration is incremental not cliff-edge.
 
-### Opportunities for Improvement
+**Why `stability_penalty: false` despite the large v4→v5 diff:** Svelte 5 is the stable current version, not a "next release." The relevant question for the stability score is: *will Svelte 5 idioms be stable for the next 6–12 months?* The evidence says yes — no Svelte 6 roadmap, no deprecation RFCs for runes, no announced breaking changes. The 5.x track is additive (template declarations, TypeScript 6 support, MCP tooling improvements).
 
-**What Svelte teaches for next-gen frameworks:**
+**However, the stability score of 6.5 reflects a real concern:** Any codebase in mid-migration from Svelte 4 to Svelte 5 contains two active convention systems. An agent writing new code for a mixed codebase must make a judgment call about which idiom to use for each new feature. The convention durability issue isn't "will Svelte 5 break next month" — it's "does the corpus of Svelte code an agent is likely to be asked to work in have a single, stable convention to follow?" The answer for many Svelte codebases in 2026 is still "no, the migration is in progress."
 
-1. **Compiler-first is powerful**
-   - Eliminate runtime overhead
-   - Optimize at build time
-   - Ship minimal JavaScript
+**Changelog source:** svelte.dev/docs/svelte/v5-migration-guide; svelte.dev/blog/svelte-5-is-alive (October 2024); GitHub releases at github.com/sveltejs/svelte/releases.
 
-2. **Less code is better**
-   - Concise syntax improves readability
-   - Reduces cognitive load
-   - Makes AI's job easier
+### Evidence: Ecosystem tooling facts
 
-3. **Automatic dependency tracking wins**
-   - No manual dependency arrays
-   - Fewer bugs
-   - Better DX
+Checklist (yes/no + links):
 
-4. **Fine-grained reactivity is fastest**
-   - No Virtual DOM needed
-   - Direct DOM updates
-   - Maximum performance
+- **Svelte DevTools** (browser extension): YES — official extension, maintained by the Svelte team. Chrome Web Store: `https://chromewebstore.google.com/detail/svelte-devtools/kfidecgcdjjfpeckbblhmfkhmlgecoff`. Firefox: available at addons.mozilla.org. Shows component tree, props/state inspection, supports Svelte 5. Includes inspector button for clicking elements and jumping to the corresponding component tree node. Requires dev mode — does not work in production builds. Maintained at `github.com/sveltejs/svelte-devtools`.
 
-5. **But: Some magic is too much**
-   - Compiler transformations can surprise
-   - Generated code can be confusing
-   - Balance explicitness with conciseness
+- **Test utilities**: YES — `@testing-library/svelte` for component testing against jsdom; `vitest-browser-svelte` for component testing in real browsers (the modern 2025 recommendation per svelte.dev/docs/svelte/testing); Playwright for E2E (also first-class per the docs). The testing landscape for Svelte 5 shifted in 2024–2025: the community moved away from jsdom-based `@testing-library/svelte` toward `vitest-browser-svelte`, which runs tests in actual browsers via Playwright's browser launchers.
 
-6. **Web standards matter**
-   - Svelte 5 moves toward standards (onclick vs on:click)
-   - Reduces framework-specific knowledge
-   - Easier to learn
+- **IDE / LSP support**: YES — official Svelte Language Server (`sveltejs/language-tools`) powers the VS Code extension (`svelte.svelte-vscode`) and can power any LSP-compatible editor (Vim/Neovim via coc.nvim, JetBrains, etc.). Provides autocomplete, type error highlighting, go-to-definition, and inline component props documentation. `svelte-check` is the CLI equivalent for CI/CD pipelines.
 
-**For next-gen AI-optimized frameworks:**
-- Keep Svelte's conciseness and auto-dependencies
-- Keep fine-grained reactivity (no Virtual DOM)
-- Add more explicitness (less compiler magic)
-- Larger ecosystem/more training data
-- Balance innovation with web standards
+- **Build tooling**: YES — Vite with `@sveltejs/vite-plugin-svelte` is the standard build path. SvelteKit (the official meta-framework) wraps this with routing, server-side rendering, and adapter-based deployment. Rollup (legacy, still works) and Webpack (via `svelte-loader`, less common) also supported.
 
-**Final AI-Friendliness: 9/10**
-- State Management: 9/10 (concise, auto-tracking, no .value)
-- Rendering: 9/10 (minimal syntax, compiler-optimized)
-- Event Handling: 8/10 (standard in Svelte 5, but lost modifiers)
+- **TypeScript checking**: YES — `svelte-check` provides static analysis across `.svelte` files including TypeScript, CSS lint, and unused export warnings. Version 4.x supports Svelte 5 runes fully. Integrated into SvelteKit's default `package.json` `check` script.
 
-**Svelte's biggest advantages**:
-1. **Ultra-concise syntax** - Least code of all frameworks
-2. **Automatic dependencies** - No manual arrays
-3. **Compiler handles optimization** - No manual memoization
-4. **Fine-grained reactivity** - Maximum performance
-5. **No .value confusion** - Consistent syntax
+- **Migration tooling**: YES — `npx sv migrate svelte-5` automates the Svelte 4→5 migration for most components. The VS Code extension adds a "Migrate Component to Svelte 5 Syntax" command palette action for file-by-file migration.
 
-**Biggest disadvantages**:
-1. **Smaller ecosystem** - Less AI training data
-2. **Compiler magic** - Harder to understand internals
-3. **Build required** - Can't run .svelte files directly
-4. **Two eras** - Legacy vs modern syntax
-5. **Framework-specific templates** - Not standard HTML/JSX
+**Notable gap:** DevTools are less mature than React DevTools — no profiler, no render-timing waterfall, no "why did this update?" attribution for fine-grained signal updates. For debugging reactivity issues in complex apps, the developer relies on `$inspect(state)` (a Svelte 5 built-in that logs reactive state changes) and browser console tools rather than a dedicated debugging panel.
 
-**Verdict**: Svelte is **exceptionally AI-friendly** for its conciseness and simplicity. The compiler-first approach is different but powerful. Main limitation is smaller ecosystem compared to React/Vue.
+**No documentation friction** finding the tooling ecosystem — svelte.dev has dedicated pages for testing (`/docs/svelte/testing`), TypeScript (`/docs/svelte/typescript`), and the official Svelte CLI (`/docs/cli/sv-check`).
 
-**Svelte proves**: You don't need Virtual DOM for great DX. Compiler optimization + fine-grained reactivity is the future.
+---
+
+## On the Horizon
+
+### Next release
+
+- **Name/version:** No announced next major version. Active development continues in the Svelte 5.x patch track (5.56.3 as of 2026-06-07).
+- **Status:** null (no announced Svelte 6 or breaking next release as of this review).
+- **What's changing:** Template-level declarations (5.56.0) — additive feature for declaring values close to where they're used without `<script>`. TypeScript 6 support rollout across language-tools, svelte-check, svelte-preprocess. `@sveltejs/mcp` AI tooling stack is at version 0.1.x and actively evolving; `query.live()` remote function API in SvelteKit 2.x is experimental and has introduced breaking changes in recent patch releases.
+- **Anticipated impact:** No breaking changes to Svelte 5 core. The `query.live()` API is the most likely source of disruption for SvelteKit-based projects in the near term; it is explicitly marked experimental. The `@sveltejs/mcp` maturing toward 1.0 will improve the AI-tooling story further. Template declarations may slightly affect idiom conventions for where derived values are placed.
+- **Stability penalty:** No — see Stability evidence. Svelte 5 core conventions (runes) are stable; the migration from v4 to v5 has already shipped. No breaking changes are announced or evidenced in the 5.x release notes.
+
+### AI-tooling investment
+
+- **What exists:**
+  - **Official MCP server** (`@sveltejs/mcp`, `github.com/sveltejs/mcp`, `mcp.svelte.dev` for remote) — first-party, maintained by the Svelte team. Provides: `list-sections` (documentation index), `get-documentation` (full docs for any section), `svelte-autofixer` (static analysis with suggestions for common AI generation errors), and a playground link generator. The autofixer is specifically designed to correct Svelte 4 idioms that AI models generate by default.
+  - **`llms.txt` suite** — `svelte.dev/llms.txt`, `svelte.dev/llms-full.txt`, `svelte.dev/llms-medium.txt`, `svelte.dev/llms-small.txt`; separate package-level files for Svelte, SvelteKit, and the CLI.
+  - **AI docs section** — `svelte.dev/docs/ai/overview` documents official AI instructions, skills, and subagents for orchestrated agent workflows.
+
+- **Observed delta:** See `ai_tooling.observed_delta` in frontmatter for the before/after. Summary: the delta for Svelte is larger than for React because Svelte 5 runes are recent enough that LLM training data still reflects Svelte 4 idioms heavily. Without `@sveltejs/mcp`: the model produced `on:click` directive syntax, `export let` props, and `$:` reactive statements on the first attempt — valid Svelte 4, wrong for Svelte 5. With the MCP server active and `svelte-autofixer` running on generated code: the model produced correct Svelte 5 runes syntax on the first attempt, and the autofixer immediately flagged the one residual `on:click` I tested as a Svelte 4 idiom. The tooling is demonstrably closing the v4→v5 training-data gap.
+
+---
+
+## Anti-Patterns from Human-Era Thinking
+
+- **`$:` reactive statements in Svelte 5 new code.** The `$: doubled = count * 2` pattern was idiomatic Svelte 3/4. In Svelte 5 it still compiles (backward compatibility) but `$derived` is the modern form. An agent trained primarily on Svelte 4 examples will emit `$:` by default — correct but anti-idiomatic for new Svelte 5 code. The `svelte-autofixer` in the official MCP server specifically catches this.
+
+- **`export let` props in Svelte 5.** Legacy: `export let title = 'default'`. Modern: `let { title = 'default' } = $props()`. Mixed usage in a codebase creates confusing reading — the two prop patterns have subtly different semantics in edge cases.
+
+- **`createEventDispatcher` for component events.** Svelte 4 pattern, deprecated in Svelte 5. The modern pattern is callback props. An agent generating a component that dispatches events should use `let { onselect } = $props()` and call `onselect(value)`, not `dispatch('select', value)`.
+
+- **Writable stores for component-local state.** Before runes, writable stores were occasionally used for local state because they provided fine-grained reactivity. In Svelte 5, `$state()` is the right tool for local reactive state; stores are appropriate for cross-component shared state where the pub/sub contract is needed.
+
+## Transferable Patterns for Next-Gen Framework
+
+- **Compiler-mediated fine-grained reactivity is the right default.** Svelte demonstrates that you don't need a virtual DOM if the compiler knows at build time which DOM nodes depend on which state. The approach eliminates an entire category of runtime overhead while requiring zero developer opt-in.
+
+- **Single-file components with scoped styles collapse accidental complexity.** The `.svelte` file that combines script/template/style with scoped CSS by default eliminates an entire class of "how should I organize this?" questions. The answer is always: together, in one file, until it needs to be split.
+
+- **Direct mutation is more natural than immutable replace.** `item.done = !item.done` is the natural expression of a toggle; `setItems(prev => prev.map(i => i.id === id ? {...i, done: !i.done} : i))` is a formality the framework imposes. Svelte demonstrates that a compiler can handle the tracking without requiring the developer to adopt functional discipline.
+
+- **Runes as compiler signals, not runtime API.** `$state`, `$derived`, `$effect` are compiler instructions, not runtime function calls. This design choice means the compiler can fully understand the reactivity graph at build time, enabling precise output without any runtime overhead. A next-gen framework should similarly use syntax-level signals rather than runtime observer registration.
+
+- **But: the v4→v5 convention split is a cautionary tale.** Svelte's implicit-reactivity-to-runes migration created a period where two incompatible convention systems coexist in the ecosystem. For a next-gen framework, designing the reactivity model right the first time — even if that means a more explicit initial API — avoids this kind of epoch-split in the corpus.

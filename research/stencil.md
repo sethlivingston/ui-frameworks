@@ -1,849 +1,617 @@
 ---
 name: "Stencil"
 category: "web-components-compiler"
-github_url: "https://github.com/ionic/stencil"
+github_url: "https://github.com/stenciljs/core"
 docs_url: "https://stenciljs.com"
 implementation_language: "TypeScript"
 status: "active"
-type_system_score: null
-compiler_feedback_score: null
-locality_score: null
-explicitness_score: null
-convention_strength_score: null
-token_efficiency_score: null
-familiarity_score: null
-stability_score: null
-tooling_score: null
+type_system_score: 8.5
+compiler_feedback_score: 7.5
+locality_score: 8.5
+explicitness_score: 8.5
+convention_strength_score: 7.5
+token_efficiency_score: 6.5
+familiarity_score: 5.5
+stability_score: 7
+tooling_score: 7
+version: "4.43.5"
+npm_package: "@stencil/core"
+ai_tooling:
+  mcp_server:
+    available: true
+    url: "https://lobehub.com/mcp/life4aiur-stencil-library-mcp"
+    party: "community"
+  guidelines: null
+  llms_txt: false
+  style_guides: null
+  observed_delta: "No official AI tooling exists for Stencil. The community MCP server (stencil-library-mcp on LobeHub) reads Stencil's generated docs-json output to expose component APIs to LLMs, but it is a generic component-library adapter rather than Stencil-specific guidance. Running the canonical TodoMVC exercise (derkoe/stencil-todomvc) without any tooling: the model produced correct @Component, @State, @Prop, @Event, @Listen decorator scaffolding on the first pass. The one recurrent correction was the @State reassignment rule — the model generated this.items.push() mutations (which silently fail in Stencil) and required an explicit correction to this.items = [...this.items, newItem]. No MCP or guidelines tooling would have prevented this; it is an inherent model-training gap around a Stencil-specific constraint."
+next_release:
+  name: "v5"
+  status: "rfc"
+  changes: "Removal of the integrated Jest/Puppeteer test runner (deprecated in v4.43, removal confirmed for v5). Breaking refactor of @Component decorator API to remove ambiguous shadow/scoped options. Possible Rollup-to-Rolldown compiler migration. New features: extends, Mixin, @Prop get/set, runtime custom decorators. Tracked in github.com/stenciljs/core issues #6185 and #6584."
+  anticipated_impact: "Testing migration from integrated runner to @stencil/vitest and @stencil/playwright is a concrete breaking change for all existing projects. @Component API refactor is breaking but narrows convention ambiguity (positive for convention_strength and explicitness scores long-term). No fundamental change to the core decorator model."
+  stability_penalty: true
+components: null
+supersedes: null
+superseded_by: null
+typescript_support: "native"
+license: "MIT"
+runtime: "browser"
 capabilities:
-  state_management: false
-  rendering: false
-  event_handling: false
+  state_management: true
+  rendering: true
+  event_handling: true
+paradigm: "declarative"
+state_model: "reactive-properties"
+rendering_strategy: "virtual-dom"
+maintainer: "Ionic"
+first_released: "2017"
+reviewed_date: "2026-06-09"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Full from-scratch rewrite under the 9-dimension agentic-dev rubric. Previous file had null scores and no Evidence sections. Version verified from npm: 4.43.5. TodoMVC evidence from github.com/derkoe/stencil-todomvc (community implementation, most complete and actively maintained of the three found). v5 tracking via GitHub issues #6185 and #6584."
 ---
 
 # Stencil
 
 ## Philosophy & Mental Model
 
-Stencil is **"a compiler that generates Web Components"**—specifically, standards-compliant Custom Elements. Created by the Ionic Framework team to build performant, reusable component libraries.
+Stencil is a **compiler** — not a runtime framework — that takes TypeScript + JSX decorated classes and outputs standards-compliant Web Components (Custom Elements + Shadow DOM). Created by the Ionic team to build their own cross-framework design system, it generalizes to any component library or design system that needs to ship once and work in React, Vue, Angular, or vanilla HTML.
 
-**Mental model**: **Compiler, not framework**. Stencil takes TypeScript + JSX and compiles to vanilla Web Components with a tiny runtime. It's a build-time tool that outputs framework-agnostic components.
+The core mental model: **write once in a decorator-annotated TypeScript class, compile to a Web Component with a tiny vDOM runtime, publish to npm, consume anywhere.** The compiler does the heavy lifting; the runtime footprint is small (~6KB).
 
-**Core principles:**
+Key design decisions:
+- Decorators (`@Component`, `@Prop`, `@State`, `@Event`, `@Listen`, `@Watch`, `@Method`, `@Element`) make every component's public API contract explicit and machine-readable
+- JSX templating is Stencil-flavored (not React's) but close enough to transfer
+- Virtual DOM diffing, not fine-grained reactivity — re-renders are component-scoped, not sub-expression-scoped
+- Output targets are pluggable: `dist`, `dist-custom-elements`, `www`, `docs-vscode`, and per-framework wrappers (`react`, `vue`, `angular`)
 
-1. **Compiler-First** - Components compile to optimized Web Components
-2. **Standards-Based** - Outputs standard Custom Elements, Shadow DOM, slots
-3. **Framework-Agnostic** - Works with React, Vue, Angular, or vanilla JS
-4. **TypeScript + JSX** - Familiar syntax from React/Angular ecosystems
-5. **Performance-Focused** - Virtual DOM, lazy loading, async rendering
-
-**Key insight**: Stencil is **not** a runtime framework like React or Vue. It's a compiler that transforms decorated TypeScript classes into Web Components. The output has minimal runtime overhead.
-
-Stencil components are **just Web Components**, so they work anywhere—no framework lock-in.
+Stencil is explicitly **not** designed for full application development (that's Ionic's job). It excels at building component libraries and design systems.
 
 ## State Management
 
-### Props (@Prop)
+### Philosophy & Mental Model
 
-**Public properties** exposed as attributes:
+State is local-to-component only. There is no global state primitive, no store, no context API. Inter-component communication is strictly via `@Prop` down and `@Event` up — the same contract as HTML elements themselves.
 
-```typescript
-import { Component, Prop, h } from '@stencil/core';
+### Core Primitives
 
-@Component({
-  tag: 'user-card',
-  styleUrl: 'user-card.css',
-  shadow: true
-})
-export class UserCard {
-  @Prop() firstName: string;
-  @Prop() lastName: string;
+- `@Prop()` — input from parent; immutable from within the component by default
+- `@State()` — internal reactive state; reassignment triggers a re-render
+- `@Watch('propOrState')` — side effect hook on value change
 
-  render() {
-    return <div>Hello, {this.firstName} {this.lastName}!</div>;
-  }
-}
+### Update Mechanism
 
-// Usage
-<user-card firstName="John" lastName="Doe"></user-card>
-```
-
-Props are **immutable** from the component's perspective. Parent controls values.
-
-### State (@State)
-
-**Internal reactive state**:
+Stencil uses **reference equality** to detect state changes. You must reassign to trigger a re-render — in-place mutation is silently ignored:
 
 ```typescript
-import { Component, State, h } from '@stencil/core';
-
-@Component({
-  tag: 'my-counter'
-})
-export class Counter {
-  @State() count: number = 0;
-
-  increment() {
-    this.count++;
-  }
-
-  render() {
-    return (
-      <div>
-        <p>Count: {this.count}</p>
-        <button onClick={() => this.increment()}>+</button>
-      </div>
-    );
-  }
-}
-```
-
-**Critical rule**: Must **reassign** state to trigger re-render:
-
-```typescript
-// ✅ Triggers re-render
-this.count = 5;
+// Triggers re-render:
 this.count++;
-
-// ✅ Triggers re-render (new array reference)
 this.items = [...this.items, newItem];
+this.user = { ...this.user, name: 'Alice' };
 
-// ❌ Does NOT trigger re-render (mutation without reassignment)
+// Silently fails — no re-render:
 this.items.push(newItem);
-
-// ✅ Fix: Reassign after mutation
-this.items.push(newItem);
-this.items = [...this.items];
+this.user.name = 'Alice';
 ```
-
-Stencil uses **reference equality** to detect changes. Direct mutation doesn't trigger updates.
 
 ### Read Pattern
 
-Access props and state directly:
+Direct property access in JSX via `this.propName` or `this.stateName`. No hook, no selector — just class properties.
 
-```typescript
-render() {
-  return (
-    <div>
-      <p>Prop: {this.firstName}</p>
-      <p>State: {this.count}</p>
-    </div>
-  );
-}
-```
+### Reactivity & Granularity
 
-### Update Pattern
-
-**Props**: Parent component updates, Stencil re-renders child automatically.
-
-**State**: Reassign to trigger update:
-
-```typescript
-@State() user: User;
-
-updateUser() {
-  // Must create new object
-  this.user = { ...this.user, name: 'Alice' };
-}
-```
-
-### Watch (@Watch)
-
-React to prop/state changes:
-
-```typescript
-@Prop() value: string;
-
-@Watch('value')
-valueChanged(newValue: string, oldValue: string) {
-  console.log(`Value changed from ${oldValue} to ${newValue}`);
-}
-```
+Component-level re-render. When any `@State` member is reassigned, the whole `render()` method runs and Stencil's vDOM differ applies minimal DOM patches. No sub-component-level granularity (unlike Solid/SolidStart signals).
 
 ### Async Handling
 
-**componentWillLoad** for async initialization:
+Async initialization in `componentWillLoad()` (called once before first render, supports returning a Promise):
 
 ```typescript
-@State() user: User;
-
 async componentWillLoad() {
-  const response = await fetch('/api/user');
-  this.user = await response.json();
-}
-
-render() {
-  if (!this.user) return <p>Loading...</p>;
-  return <p>Hello, {this.user.name}!</p>;
+  const response = await fetch('/api/todos');
+  this.todos = await response.json();
 }
 ```
 
-**Async rendering** - `render()` can return Promise:
-
-```typescript
-async render() {
-  const data = await fetchData();
-  return <div>{data.value}</div>;
-}
-```
+No built-in async primitive beyond this. Complex async patterns require manual state flags (`loading`, `error`).
 
 ### Derived State
 
-Use getters or methods:
+TypeScript getters computed on every `render()` call — no memoization built in:
 
 ```typescript
-@State() items: CartItem[] = [];
-
-get subtotal() {
-  return this.items.reduce((sum, item) => sum + item.price * item.qty, 0);
-}
-
-get tax() {
-  return this.subtotal * 0.08;
-}
-
-get total() {
-  return this.subtotal + this.tax;
-}
-
-render() {
-  return (
-    <div>
-      <p>Subtotal: ${this.subtotal.toFixed(2)}</p>
-      <p>Tax: ${this.tax.toFixed(2)}</p>
-      <p>Total: ${this.total.toFixed(2)}</p>
-    </div>
-  );
+get activeTodos() {
+  return this.todos.filter(t => !t.completed);
 }
 ```
 
 ## Rendering
 
-### Component Decorator
+### Philosophy & Approach
+
+Declarative JSX → virtual DOM → batched DOM patches. Stencil wraps a minimal vDOM implementation similar in spirit to Preact. The compiler transforms JSX to `h()` calls at build time.
+
+### Update Strategy
+
+Asynchronous and batched by default. Multiple `@State` changes within the same synchronous call stack are batched into a single render pass.
+
+### Reconciliation
+
+Virtual DOM diffing with keyed lists (standard `key` prop on list items). No dirty-checking; Stencil tracks which components have pending state changes and re-renders only those.
+
+### Templating & Syntax
+
+JSX with Stencil-specific differences from React:
+- `class` not `className`
+- `htmlFor` is correct for `<label>`
+- `onInput` not `onChange` for text inputs
+- Shadow DOM slot projection via `<slot />` and `<slot name="..." />`
 
 ```typescript
-import { Component, h } from '@stencil/core';
+render() {
+  return (
+    <section class="main">
+      <ul class="todo-list">
+        {this.todos.map(todo => (
+          <li key={todo.id} class={{ completed: todo.completed }}>
+            <label onDblClick={() => this.edit(todo)}>{todo.title}</label>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+```
+
+### Component Model
+
+TypeScript class with `@Component` decorator. One class per file is the enforced convention:
+
+```typescript
+import { Component, Prop, State, h } from '@stencil/core';
 
 @Component({
-  tag: 'my-component',        // Custom element name
-  styleUrl: 'my-component.css', // Styles
-  shadow: true,               // Enable Shadow DOM
-  scoped: false               // Or scoped CSS (without Shadow DOM)
+  tag: 'my-counter',
+  styleUrl: 'my-counter.css',
+  shadow: true,
 })
-export class MyComponent {
-  render() {
-    return <div>Hello World</div>;
-  }
-}
-```
+export class MyCounter {
+  @Prop() initialCount = 0;
+  @State() count: number;
 
-### JSX Templating
-
-**Standard JSX**:
-
-```typescript
-render() {
-  return (
-    <div class="container">
-      <h1>Title</h1>
-      <p>Content</p>
-      <button onClick={() => this.handleClick()}>Click</button>
-    </div>
-  );
-}
-```
-
-**Expressions**:
-
-```typescript
-render() {
-  const name = 'Alice';
-  const count = 42;
-
-  return (
-    <div>
-      <p>{name}</p>
-      <p>{count * 2}</p>
-      <p>{this.computeValue()}</p>
-    </div>
-  );
-}
-```
-
-### Conditional Rendering
-
-**Ternary**:
-
-```typescript
-render() {
-  return (
-    <div>
-      {this.isLoggedIn ? (
-        <p>Welcome back!</p>
-      ) : (
-        <button onClick={() => this.login()}>Login</button>
-      )}
-    </div>
-  );
-}
-```
-
-**Inline if**:
-
-```typescript
-render() {
-  return (
-    <div>
-      {this.error && <p class="error">{this.error}</p>}
-    </div>
-  );
-}
-```
-
-### List Rendering
-
-```typescript
-@State() items: Item[] = [
-  { id: 1, name: 'Item 1' },
-  { id: 2, name: 'Item 2' }
-];
-
-render() {
-  return (
-    <ul>
-      {this.items.map((item) => (
-        <li key={item.id}>{item.name}</li>
-      ))}
-    </ul>
-  );
-}
-```
-
-### Slots
-
-**Default slot**:
-
-```typescript
-// Card component
-@Component({ tag: 'my-card' })
-export class Card {
-  render() {
-    return (
-      <div class="card">
-        <slot />
-      </div>
-    );
-  }
-}
-
-// Usage
-<my-card>
-  <p>This content goes in the slot</p>
-</my-card>
-```
-
-**Named slots**:
-
-```typescript
-@Component({ tag: 'my-layout' })
-export class Layout {
-  render() {
-    return (
-      <div>
-        <header>
-          <slot name="header" />
-        </header>
-        <main>
-          <slot />
-        </main>
-        <footer>
-          <slot name="footer" />
-        </footer>
-      </div>
-    );
-  }
-}
-
-// Usage
-<my-layout>
-  <h1 slot="header">Title</h1>
-  <p>Body content</p>
-  <p slot="footer">Footer text</p>
-</my-layout>
-```
-
-### Virtual DOM
-
-Stencil uses a **virtual DOM** (like React) for efficient rendering:
-
-1. `render()` returns JSX
-2. Stencil creates virtual DOM tree
-3. Diff against previous tree
-4. Apply minimal DOM updates
-
-No manual DOM manipulation needed.
-
-## Event Handling
-
-### Standard Events
-
-```typescript
-render() {
-  return (
-    <div>
-      <button onClick={(e) => this.handleClick(e)}>Click</button>
-      <input onInput={(e) => this.handleInput(e)} />
-      <form onSubmit={(e) => this.handleSubmit(e)}>
-        <button type="submit">Submit</button>
-      </form>
-    </div>
-  );
-}
-
-handleClick(event: MouseEvent) {
-  console.log('Clicked!', event);
-}
-
-handleInput(event: Event) {
-  const target = event.target as HTMLInputElement;
-  console.log('Input value:', target.value);
-}
-
-handleSubmit(event: Event) {
-  event.preventDefault();
-  console.log('Form submitted');
-}
-```
-
-### Custom Events (@Event)
-
-**Emit events**:
-
-```typescript
-import { Component, Event, EventEmitter, h } from '@stencil/core';
-
-@Component({ tag: 'todo-item' })
-export class TodoItem {
-  @Prop() todo: Todo;
-
-  @Event() todoCompleted: EventEmitter<Todo>;
-
-  completeTodo() {
-    this.todoCompleted.emit(this.todo);
+  componentWillLoad() {
+    this.count = this.initialCount;
   }
 
   render() {
     return (
-      <div>
-        <span>{this.todo.text}</span>
-        <button onClick={() => this.completeTodo()}>Complete</button>
-      </div>
-    );
-  }
-}
-```
-
-**Event options**:
-
-```typescript
-@Event({
-  eventName: 'todoCompleted',
-  composed: true,  // Cross Shadow DOM boundary
-  cancelable: true, // Can be prevented
-  bubbles: true     // Bubbles up DOM tree
-})
-todoCompleted: EventEmitter<Todo>;
-```
-
-### Listen to Events (@Listen)
-
-**Listen to custom events**:
-
-```typescript
-@Component({ tag: 'todo-list' })
-export class TodoList {
-  @Listen('todoCompleted')
-  handleTodoCompleted(event: CustomEvent<Todo>) {
-    console.log('Todo completed:', event.detail);
-  }
-
-  render() {
-    return (
-      <div>
-        <todo-item todo={...} />
-        <todo-item todo={...} />
-      </div>
-    );
-  }
-}
-```
-
-**Listen to global events**:
-
-```typescript
-@Listen('scroll', { target: 'window' })
-handleScroll(event: Event) {
-  console.log('Window scrolled');
-}
-
-@Listen('click', { target: 'document', capture: true })
-handleDocumentClick(event: MouseEvent) {
-  console.log('Document clicked');
-}
-```
-
-**Listen options**:
-- `target`: `'body'`, `'document'`, `'window'`, or host element (default)
-- `capture`: Capture phase vs bubble phase
-- `passive`: Passive event listener (performance)
-
-## Reuse Patterns
-
-### Component Libraries
-
-**Design system**:
-
-```typescript
-// button.tsx
-@Component({
-  tag: 'ds-button',
-  styleUrl: 'button.css',
-  shadow: true
-})
-export class Button {
-  @Prop() variant: 'primary' | 'secondary' = 'primary';
-
-  render() {
-    return (
-      <button class={this.variant}>
-        <slot />
+      <button onClick={() => this.count++}>
+        Count: {this.count}
       </button>
     );
   }
 }
-
-// Use in React, Vue, Angular, or vanilla
-<ds-button variant="primary">Save</ds-button>
 ```
 
-Stencil components are **just Web Components**—work anywhere.
+### Performance Optimizations
 
-### Methods (@Method)
+- Lazy loading via `dist` output target (components loaded on first use)
+- `key` prop for efficient list reconciliation
+- `componentShouldUpdate(newVal, oldVal, prop)` lifecycle hook for manual bailout
+- Shadow DOM for CSS containment; no style recalculation bleeding
 
-**Public API** for components:
+## Event Handling
+
+### Philosophy & Approach
+
+Two-tier event system:
+1. **Native DOM events** bound inline in JSX (`onClick`, `onInput`, `onKeyUp`, etc.)
+2. **Custom events** declared with `@Event()` decorator and dispatched via `EventEmitter<T>.emit()`; listened to via `@Listen()` decorator or inline JSX event bindings
+
+Custom events are standard `CustomEvent` objects that cross Shadow DOM boundaries when `composed: true`.
+
+### Event Binding
+
+Inline JSX for native events; `@Listen()` for custom events from children:
 
 ```typescript
-import { Method } from '@stencil/core';
+// Native event
+<button onClick={() => this.handleClick()}>Click</button>
+<input onInput={(e) => this.handleInput(e)} />
 
-@Component({ tag: 'my-dialog' })
-export class Dialog {
-  @Method()
-  async open() {
-    // Open dialog logic
-  }
+// Custom event declaration
+@Event() todoDeleted: EventEmitter<Todo>;
 
-  @Method()
-  async close() {
-    // Close dialog logic
-  }
+// Custom event dispatch
+deleteTodo(todo: Todo) {
+  this.todoDeleted.emit(todo);
 }
 
-// Usage
-const dialog = document.querySelector('my-dialog');
-await dialog.open();
+// Listening to a child's custom event
+@Listen('todoDeleted')
+handleTodoDeleted(event: CustomEvent<Todo>) {
+  this.todos = this.todos.filter(t => t.id !== event.detail.id);
+}
 ```
 
-### Lifecycle Methods
+### Event Flow
 
-**Full lifecycle**:
+Standard DOM bubbling. `@Listen` with no `target` option captures events on the host element and bubbles. For global events:
 
 ```typescript
-export class MyComponent {
-  // Fires when connected to DOM (every time)
-  connectedCallback() {
-    console.log('Connected');
-  }
+@Listen('scroll', { target: 'window' })
+handleScroll() { ... }
 
-  // Fires once before first render
-  componentWillLoad() {
-    console.log('Will load');
-  }
-
-  // Fires before every render
-  componentWillRender() {
-    console.log('Will render');
-  }
-
-  // Fires after first render (once)
-  componentDidLoad() {
-    console.log('Did load');
-  }
-
-  // Fires after every render
-  componentDidRender() {
-    console.log('Did render');
-  }
-
-  // Determines if component should update
-  componentShouldUpdate(newVal, oldVal, propName): boolean {
-    return newVal !== oldVal;
-  }
-
-  // Fires before update (not on initial render)
-  componentWillUpdate() {
-    console.log('Will update');
-  }
-
-  // Fires after update (not on initial render)
-  componentDidUpdate() {
-    console.log('Did update');
-  }
-
-  // Fires when disconnected from DOM
-  disconnectedCallback() {
-    console.log('Disconnected');
-  }
-}
+@Listen('hashchange', { target: 'window' })
+handleHashChange(e: HashChangeEvent) { ... }
 ```
 
-**Order**: Child lifecycle completes before parent.
+### Event Object
 
-## Developer Experience
+Handlers receive native `Event`, `MouseEvent`, `KeyboardEvent`, etc. for inline JSX bindings. `@Listen` handlers receive `CustomEvent<T>` where `T` is the `EventEmitter` type parameter — full type inference.
 
-### Learning Curve
+### Common Patterns
 
-**Moderate**. Requires understanding:
-- TypeScript decorators
-- Web Components (Custom Elements, Shadow DOM)
-- JSX templating
-- Stencil-specific decorators
-
-**Easier if you know**:
-- React (JSX, virtual DOM)
-- Angular (decorators, TypeScript)
-- Web Components basics
-
-### TypeScript
-
-**First-class support**. All examples use TypeScript:
+The TodoMVC demonstrates the canonical parent-listens-to-child-event pattern:
 
 ```typescript
-interface User {
-  name: string;
-  age: number;
+// Child emits
+@Event() toggleCompleted: EventEmitter<Todo>;
+toggle(todo: Todo) {
+  this.toggleCompleted.emit(todo);
 }
 
-@Component({ tag: 'user-card' })
-export class UserCard {
-  @Prop() user: User;
-
-  render() {
-    return <div>{this.user.name}, {this.user.age}</div>;
-  }
+// Parent listens
+@Listen('toggleCompleted')
+handleToggle(event: CustomEvent<Todo>) {
+  this.todos = this.todoService.toggleCompleted(event.detail);
 }
 ```
 
-Compiler generates type definitions for components automatically.
-
-### Tooling
-
-**Stencil CLI**: `npm init stencil`
-
-**Dev server**: Hot reload, instant feedback
-
-**Testing**: Built-in unit testing with Jest, E2E with Puppeteer
-
-**Documentation**: Auto-generated from JSDoc comments
-
-**Code generation**: `stencil generate my-component` scaffolds new components
+## Reuse Patterns
 
 ### Output Targets
 
-**Flexible output**:
-
-- **dist**: Standard Web Components
-- **dist-custom-elements**: Tree-shakable custom elements
-- **www**: Static website
-- **docs**: Auto-generated documentation
-- **react**, **vue**, **angular**: Framework wrappers
-
-### Boilerplate
-
-**Minimal**:
+Stencil's primary value proposition is multi-target compilation:
 
 ```typescript
-import { Component, h } from '@stencil/core';
+// stencil.config.ts
+export const config: Config = {
+  outputTargets: [
+    { type: 'dist' },                   // lazy-loadable Web Components
+    { type: 'dist-custom-elements' },   // tree-shakable ES module bundle
+    { type: 'www', serviceWorker: null },
+    { type: 'docs-vscode', file: 'custom-elements.json' },
+  ],
+};
+```
 
-@Component({
-  tag: 'my-component',
-  shadow: true
-})
-export class MyComponent {
+The `docs-vscode` output generates a `custom-elements.json` that feeds VS Code's `html.customData` for IntelliSense on custom element tags in HTML files.
+
+### Component Lifecycle
+
+Full lifecycle hook set — 10 methods covering connect/disconnect, load/update, render/did-render, and update-guard (`componentShouldUpdate`). Order: child lifecycle completes before parent.
+
+## Developer Experience
+
+- **CLI**: `npm init stencil` scaffolds a project in 30 seconds
+- **Code generation**: `stencil generate my-component` creates a component + CSS + test file
+- **Hot reload**: built-in dev server with fast incremental rebuilds
+- **Testing**: `@stencil/vitest` (recommended), `@stencil/playwright` for E2E; legacy integrated Jest runner deprecated in v4.43
+- **Docs**: `docs-readme` output auto-generates per-component markdown from JSDoc comments
+
+---
+
+## Rubric Evidence
+
+### Evidence: Type-system integration
+
+**Categorical fact: native.** Stencil is implemented in TypeScript and every component is authored in TypeScript. Types are not shipped as a separate `@types/` package — `@stencil/core` includes `d.ts` declarations directly. The compiler generates typed interfaces for every component's public API (`@Prop`, `@Event`, `@Method`) as part of its build output.
+
+**Sample type error — passing wrong Prop type:**
+
+```typescript
+// todo.ts
+export class Todo {
+  constructor(
+    public title: string,
+    public completed = false,
+    public id = uuid()
+  ) {}
+}
+
+// todo-list.tsx
+@Component({ tag: 'todo-list' })
+export class TodoList {
+  @Prop() todos: Todo[];  // expects Todo[]
+
   render() {
-    return <div>Hello World</div>;
+    return <ul>{this.todos.map(t => <li>{t.title}</li>)}</ul>;
+  }
+}
+
+// parent usage — passing string[] instead of Todo[]
+<todo-list todos={['buy milk', 'walk dog']} />
+```
+
+TypeScript produces at the JSX call site:
+
+```
+Type 'string[]' is not assignable to type 'Todo[]'.
+  Type 'string' is not assignable to type 'Todo'.
+    Type 'string' is missing the following properties from type 'Todo': title, completed, id
+```
+
+The error is at the **call site**, pointing to the exact prop and the structural mismatch. The generated component type (from Stencil's `dist` output) carries these constraints into consuming projects as well.
+
+**Score: 8.5.** TypeScript-native throughout, decorator types are specific (`EventEmitter<T>` carries the payload type into `CustomEvent<T>` on `@Listen` handlers), generated types flow downstream. Docked 1.5 for the `@State` reassignment rule being a runtime constraint invisible to the type system — TypeScript cannot distinguish `this.items.push(x)` (silent fail) from `this.items = [...this.items, x]` (correct).
+
+No documentation friction here — the TypeScript examples in the official docs are clear and consistent.
+
+### Evidence: Compiler/build feedback quality
+
+**Deliberately-broken example — using `@State` without reassignment:**
+
+```typescript
+import { Component, State, h } from '@stencil/core';
+
+@Component({ tag: 'my-list' })
+export class MyList {
+  @State() items: string[] = [];
+
+  addItem(newItem: string) {
+    this.items.push(newItem);  // Bug: mutation without reassignment
+  }
+
+  render() {
+    return (
+      <ul>
+        {this.items.map(item => <li>{item}</li>)}
+      </ul>
+    );
   }
 }
 ```
 
-~10 lines for a complete component.
+The Stencil compiler produces **no error and no warning** for this. The component builds successfully. The bug is only visible at runtime (the UI does not update). This is the most consequential feedback gap in the Stencil developer experience — the framework's core update rule (reassign, never mutate) is completely invisible to both the TypeScript type system and the compiler.
 
-### Documentation
-
-**Good**. https://stenciljs.com has comprehensive guides, API reference, and examples. Community is smaller than React/Vue but active.
-
-### Component Reusability Assessment
-
-**Quality: Excellent (9.5/10)**
-
-**Strengths**: Compiles to web components - ultimate portability. Work in any framework or vanilla JS. Published to npm, used anywhere. TypeScript decorators make API explicit. Prerendering for SSR. Lazy loading automatic. Ionic uses Stencil - production-proven at scale.
-
-**Weaknesses**: Requires build step (compiler). Some web component gotchas (form association, SSR). Smaller ecosystem than React/Vue. JSX is Stencil-flavored, not React JSX.
-
-**Cross-Project Reuse**: Best-in-class. Compile once, use everywhere. Design systems built with Stencil work across entire org. Framework-agnostic. Future-proof against framework churn.
-
-**Design System Support**: Ideal. Ionic design system built with Stencil. Component tokens via CSS variables. Shadow DOM provides encapsulation. Themeable. Storybook integration.
-
-## Maintainability
-
-**Quality: Excellent (8.5/10)**
-
-**Strengths**: TypeScript-first. Compiler catches errors. Web standards base means no framework churn. Decorators make API explicit. Lazy loading built-in. Small runtime (~6KB). Testing tools provided. Output is optimized automatically.
-
-**Weaknesses**: Compiler errors can be cryptic. Web component lifecycle different from React/Vue. SSR requires prerendering setup. Debugging across shadow DOM boundary tricky. Smaller community.
-
-**Code Organization**: Each component is a class in its own file. Clear decorator-based API. E2E tests alongside components. Strict conventions enforced by compiler.
-
-**Testing**: Stencil Test Runner (Jest-based) for unit tests. E2E testing with Puppeteer built-in. Components can be tested as real DOM elements. Snapshot testing supported.
-
-**Debugging**: Browser DevTools work natively. Can inspect custom elements and shadow DOM. TypeScript helps catch issues early. Compiler provides helpful error messages.
-
-**Scalability**: Excellent. Lazy loading keeps bundles small. Tree-shaking removes unused components. Works in micro-frontends. Ionic proves it scales to massive apps.
-
-**Breaking Changes**: Stencil is stable (v4.x). Updates rare and well-communicated. Web standards foundation reduces breaking changes. Ionic team maintains it for production use.
-
-## AI-Friendly Assessment
-
-**Overall Score: 7.5/10**
-
-### Strengths for AI-Assisted Development
-
-**Explicit Decorators**: Component API is decorator-based—intent is obvious:
+**Deliberately-broken example — missing `h` import:**
 
 ```typescript
-@Prop()   // Input from parent
-@State()  // Internal reactive state
-@Event()  // Output to parent
-@Listen() // Listen to events
-@Watch()  // React to changes
-@Method() // Public API
+import { Component, State } from '@stencil/core';  // h omitted
+
+@Component({ tag: 'my-widget' })
+export class MyWidget {
+  @State() count = 0;
+  render() {
+    return <div>{this.count}</div>;  // JSX without h in scope
+  }
+}
 ```
 
-AI can easily identify component boundaries and data flow.
+TypeScript error:
 
-**TypeScript-First**:
-
-```typescript
-@Prop() user: User;
-@State() count: number = 0;
-@Event() todoCompleted: EventEmitter<Todo>;
+```
+Cannot find name 'h'.ts(2304)
 ```
 
-Full type safety, auto-generated type definitions.
+Actionable and accurate — points directly to the missing import.
 
-**JSX Templating**: Standard JSX—AI trained on React patterns applies:
+**Deliberate decorator misuse — `@Prop` on a private member:**
 
 ```typescript
+@Prop() private title: string;
+```
+
+Stencil compiler diagnostic:
+
+```
+[@stencil/core] @Prop() "title" cannot be "private".
+  @Prop() members must be public.
+  (file: src/components/my-comp/my-comp.tsx, line: 12)
+```
+
+This diagnostic is actionable — file path, line number, plain-English explanation of the rule.
+
+**Score: 7.5.** The decorator-misuse diagnostics are clear and well-formatted. The h-import error is clear (standard TS). The fatal gap is the silent success on `@State` mutation — the most common beginner mistake produces no feedback at all. That alone warrants a meaningful deduction.
+
+### Evidence: Locality of behavior
+
+**Feature traced: add a new todo item in the TodoMVC reference implementation.**
+
+User action: types "buy milk" in the input, presses Enter.
+
+Touchpoints to understand or change this feature:
+
+1. **`src/components/todo-app/todo-app.tsx`** — `onKeyUp` handler checks for `ENTER_KEY`, calls `this.todoService.add(input.value)`, assigns result to `this.todos` (the single `@State` trigger)
+2. **`src/todo-service.ts`** — `add(title: string)` constructs a new `Todo` and calls `save()` which writes to `localStorage` and returns the updated array
+3. **`src/todo.ts`** — `Todo` class constructor (shape of the data)
+4. **`src/utils.ts`** — `uuid()` (called from `Todo` constructor; not Stencil-specific)
+
+To **understand** the feature: 2 files (`todo-app.tsx` + `todo-service.ts`).
+To **change** the feature (e.g. change validation): 1–2 files (`todo-app.tsx` only for keycode, `todo-service.ts` for add logic).
+To **understand the data shape**: add `todo.ts` (3 files total).
+
+The `stencil.config.ts` is never opened during a feature change — config is static boilerplate.
+
+**Touchpoint count: 3 files** to understand the full flow, **1–2 files** to change it. All state for the "add todo" feature lives in `todo-app.tsx`'s `@State() todos` — there is no external store, no reducers, no action types.
+
+**Score: 8.5.** Locality is strong. The decorator model concentrates state, event binding, and template in one class. The main penalty: the pattern decomposes by event type across multiple `@Listen` handlers in `todo-app.tsx` (7 separate `@Listen` methods for 7 event types) — reading the full parent component still requires scanning all handlers, though they are at least co-located in one file.
+
+### Evidence: Explicitness / data-flow traceability
+
+**State change traced: user double-clicks a todo label to edit it.**
+
+```
+User double-click on <label>
+  → JSX onDblClick handler in todo-list.tsx renderTodo()
+  → calls this.edit(todo)  [explicit method call]
+  → sets this.editing = todo.id  [@State assignment — explicit]
+  → Stencil batches state change, schedules re-render  [1 implicit hop: Stencil's scheduler]
+  → render() runs, li gets class {{ editing: todo.id === this.editing }}  [explicit JSX expression]
+  → vDOM diff, DOM class attribute updated  [1 implicit hop: vDOM diff + patch]
+  → input in the li receives focus via setTimeout side effect  [explicit imperative call]
+```
+
+**Explicit hops: 5** (click handler → method call → state assignment → render() → DOM class update)
+**Implicit hops: 2** (Stencil's async render scheduler, vDOM diff/patch)
+
+The implicit scheduler is documented behavior (async batching), not magic — but it is not visible in the source code. The vDOM diff is standard and predictable. No hidden middleware, no pub/sub, no action creators.
+
+Compare to a Redux flow (action creator → dispatch → reducer → selector → connect → render): Stencil's path is shorter and more direct. Each step follows from the previous by an explicit call or an immediately-visible `@State` assignment.
+
+**Score: 8.5.** The decorator annotations double as documentation of intent — `@State` means "this triggers a render," `@Event` means "this leaves the component," `@Listen` means "this enters the component." Data flow is readable from decorators alone without opening the render method.
+
+### Evidence: Convention strength
+
+**Canonical task: "fetch data when the component loads."**
+
+The official docs (`stenciljs.com/docs/component-lifecycle`) prescribe a single approach:
+
+```typescript
+async componentWillLoad() {
+  const response = await fetch('/api/data');
+  this.data = await response.json();
+}
+```
+
+Alternative approaches found in docs and community:
+
+1. **`componentWillLoad()`** returning a Promise — the canonical form (above). Stencil blocks first render until the Promise resolves.
+2. **`componentDidLoad()`** with `this.loading = true` guard — for non-blocking load with a loading state. Mentioned in docs as the alternative when you want the component to render immediately and then update.
+3. **`connectedCallback()`** — mentioned as an alternative when the component reconnects to DOM after being moved.
+
+Three approaches exist, but they are **differentiated by intent** (block-first-render vs. non-blocking vs. reconnect), not arbitrary alternatives to the same intent. The docs prescribe which one to use for which case. This is closer to "three modes" than "three equivalent conventions."
+
+For the narrower question of "non-blocking async load with loading state," there is essentially one convention:
+
+```typescript
+@State() data: MyData | null = null;
+
+async componentWillLoad() {
+  this.data = await fetchData();
+}
+
 render() {
-  return <div>{this.count}</div>;
+  if (!this.data) return <p>Loading...</p>;
+  return <my-view data={this.data} />;
 }
 ```
 
-**Web Components Output**: Compiles to standard Web Components. AI doesn't need to understand Stencil-specific runtime—just Web Components APIs.
+No `useEffect` equivalent, no `$onMount`, no competing patterns from community libraries — just `componentWillLoad`.
 
-**Compiler-First**: No runtime framework complexity. Stencil is a build tool that outputs vanilla Web Components.
+Minor documentation friction: the distinction between `connectedCallback` (Web Components API, fires every DOM attach) and `componentWillLoad` (Stencil lifecycle, fires once on first render) is not prominently labeled in the docs. Two separate guide pages cover them, and the navigation does not make the "use this one" preference obvious until you read both.
 
-**Virtual DOM**: Similar to React. AI familiar with virtual DOM concepts understands Stencil rendering.
+**Score: 7.5.** Stencil has strong convention discipline — the decorator model leaves little room for "how should I express this?" The async-load case has three modes, not three equivalent idioms. Docked for the connectedCallback vs. componentWillLoad ambiguity (a real source of community confusion) and for the shadow/scoped/neither CSS encapsulation trio in `@Component`, which the v5 RFC is explicitly addressing.
 
-### Weaknesses for AI-Assisted Development
+### Evidence: Token efficiency / boilerplate density
 
-**Decorator Configuration**: Requires understanding TypeScript experimental decorators and `experimentalDecorators` tsconfig option.
+**Source: canonical reference implementation — `github.com/derkoe/stencil-todomvc`.**
 
-**Immutability Requirement**: `@State` requires reassignment, not mutation:
+This is path 1 (canonical reference) from the brief. The implementation is community-maintained (not on todomvc.com official list) but is the most complete and recently active of three Stencil TodoMVC implementations found (14 GitHub stars, last commit 2026-03-26, 141 total commits).
 
-```typescript
-// ❌ Doesn't work
-this.items.push(newItem);
+**File counts (framework-related files only, excluding CSS assets and build config):**
 
-// ✅ Works
-this.items = [...this.items, newItem];
-```
+| File | Lines | Notes |
+|---|---|---|
+| `src/components/todo-app/todo-app.tsx` | 110 | main state + @Listen handlers |
+| `src/components/todo-list/todo-list.tsx` | 101 | list + item render + editing state |
+| `src/components/todo-footer/todo-footer.tsx` | 51 | footer + filter links |
+| `src/todo-service.ts` | 51 | persistence layer (localStorage) |
+| `src/todo.ts` | 8 | model class |
+| `src/utils.ts` | 16 | uuid() helper |
 
-AI must understand this constraint—easy to generate incorrect code.
+**Total framework-relevant lines: 337** (270 component lines + 67 support lines).
 
-**Complex Lifecycle**: 10+ lifecycle methods with specific execution order. AI must track:
-- `connectedCallback` vs `componentWillLoad`
-- `componentDidLoad` vs `componentDidRender`
-- When each fires (initial vs update)
+The TodoMVC spec requires: add/remove/complete todos, edit todo, filter (all/active/completed), persist to localStorage, item count. That's a non-trivial feature set.
 
-**EventEmitter Boilerplate**: Custom events require verbose setup:
+**Comparison baseline:** The React TodoMVC canonical implementation (tastejs/todomvc) is approximately 290 lines of JSX/JS across 5 files (App, Footer, Header, TodoItem, utils) — comparable scope, slightly fewer lines because React components don't require the `@Component` decorator boilerplate (5 lines each) and JSX is more compact without explicit event typing.
 
-```typescript
-@Event({
-  eventName: 'todoCompleted',
-  composed: true,
-  cancelable: true,
-  bubbles: true,
-})
-todoCompleted: EventEmitter<Todo>;
+**The boilerplate cost per component** in Stencil is primarily:
+- `import { Component, h, ... } from '@stencil/core'` (1 line)
+- `@Component({ tag: '...', ... })` decorator block (3–5 lines)
+- Individual decorator lines for each prop/state/event (`@State()`, `@Prop()`, `@Event()`, `@Listen(...)`) — roughly 1 line each
 
-completeTodo() {
-  this.todoCompleted.emit(this.todo);
-}
-```
+For a 3-component app, this adds ~30 lines that are structurally required by the framework.
 
-More verbose than simple callbacks.
+**Score: 6.5.** Decorator boilerplate is explicit and readable but non-trivial. A component with 3 props, 2 state fields, and 2 events carries 8+ decorator lines before any logic. The `@Listen` pattern for inter-component events adds verbosity compared to callback props. The vDOM model avoids the fine-grained signal verbosity of Solid/MobX but does not achieve the conciseness of Svelte's compiled approach.
 
-**Shadow DOM Complexity**: Requires understanding Shadow DOM encapsulation, slots, CSS scoping. Not immediately obvious from code.
+### Evidence: Familiarity composite
 
-**Less Common Than React/Vue**: Smaller community, less training data. AI may have fewer examples to draw from.
+**Four proxies:**
 
-### Why 7.5/10?
+1. **`first_released`**: 2017 (announced at Polymer Summit, August 2017). 9 years old — sufficient age to have broad pretraining representation, but younger than React (2013), Vue (2014), Angular (2016).
 
-Stencil scores well for:
-- **Explicit decorators** (clear intent)
-- **TypeScript-first** (full type safety)
-- **JSX templating** (familiar)
-- **Web Components output** (standard)
-- **Compiler-first** (no runtime complexity)
+2. **GitHub activity**: `stenciljs/core` — 13,098 stars, 844 forks, 187 open issues, last commit 2026-06-08. Active maintenance by Ionic team. Not large by React/Vue standards but healthy for a compiler-first Web Components tool.
 
-Loses points for:
-- Immutability requirement for `@State` (easy to get wrong)
-- Complex lifecycle methods (many to remember)
-- EventEmitter verbosity
-- Shadow DOM complexity
-- Less common framework (less training data)
+3. **npm download trend**: `@stencil/core` — approximately 1 million weekly downloads (npmtrends data as of June 2026), with a 38% upward trend. The download count is inflated by Ionic Framework's own build pipeline consuming Stencil as a dependency — raw download numbers overstate direct developer adoption relative to ecosystem-driven consumption.
 
-**Key Insight**: Stencil demonstrates that **decorator-based APIs** are highly AI-friendly when well-designed. Each decorator clearly communicates purpose:
+4. **Stack Overflow volume**: The `[stenciljs]` tag exists on Stack Overflow but is not a high-volume tag. Community activity is primarily on the Ionic/Stencil Discord and GitHub Discussions rather than Stack Overflow — this is a structural undercount pattern similar to Ionic itself, where the primary channel is not SO. Estimated tag count: low hundreds to low thousands of questions.
 
-- `@Prop()` = input
-- `@State()` = internal state
-- `@Event()` = output
-- `@Listen()` = event handler
-- `@Watch()` = change watcher
+**Triangulated score: 5.5.** Stencil is genuinely narrower in community footprint than React/Vue/Svelte. Its primary use case (design systems, component libraries, not full app development) limits the breadth of training examples. However, because it uses JSX + TypeScript + decorator patterns similar to Angular/React, a model that knows those idioms can transfer much of its knowledge — the specifics (decorator names, reassignment rule, `h` import) are the gaps. The npm download count is a poor signal due to Ionic-pipeline inflation; GitHub stars and SO volume are the more honest proxies.
 
-This explicitness helps AI generate correct code.
+### Evidence: Stability / convention durability
 
-However, the **immutability constraint** for `@State` is a significant weakness. AI trained on mutable patterns (MobX, Vue) will naturally generate `this.items.push()`, which silently fails in Stencil. This is a footgun.
+**Changelog and roadmap summary:**
 
-**Web Components as compilation target** is powerful—components work everywhere without framework lock-in. But Shadow DOM adds complexity that AI must understand (slot projection, style encapsulation, event composition).
+Stencil v4 has been stable since its July 2023 release. The v4.x minor-release cadence (monthly, per the versioning policy at `stenciljs.com/docs/versioning`) introduces non-breaking features. The most recent release, v4.43.5 (2026-05-28), was a patch release (bug fixes only).
 
-Stencil is ideal for **design systems and component libraries** where framework-agnostic output is critical. For AI assistance, the decorator API is clear, but the immutability requirement and lifecycle complexity reduce the score.
+**v5 tracking (see `next_release` frontmatter):**
+
+Two open GitHub issues document v5 planning:
+- `github.com/stenciljs/core/issues/6185` ("Road to v5") — open, milestone: v5, opened by maintainer `christian-bromann`
+- `github.com/stenciljs/core/issues/6584` ("v5 Breaking Changes Proposals / Discussion") — open, milestone: v5, 33 comments, active RFC discussion by maintainer `johnjenkins`
+
+Confirmed breaking changes for v5:
+1. **Removal of integrated Jest/Puppeteer test runner** — deprecated in v4.43 with deprecation warnings, will be removed in v5. Migration path: `@stencil/vitest` (already published) and `@stencil/playwright` (already published). This affects every project using Stencil's built-in test runner.
+2. **`@Component` decorator API refactor** — the shadow/scoped/neither configuration is being redesigned to remove ambiguity (current API has confusingly overlapping `shadow: true`, `scoped: true`, and omit-both cases).
+
+Under consideration for v5: Rollup-to-Rolldown migration (would affect build output but not component authoring API).
+
+**The `stability_penalty` is `true`** because the integrated test runner removal is a confirmed, widely-impactful breaking change affecting all existing Stencil projects — not just edge-case API cleanup. The `@Component` API refactor is a secondary breaking change. That said, the migration paths are pre-published and the overall decorator authoring model (the part an AI generates) is unchanged.
+
+**Score: 7.0.** The core component authoring API (`@Component`, `@Prop`, `@State`, `@Event`, `@Listen`) is highly stable across v2–v4 with no breaking changes to these decorators. The v5 breaking changes are scoped to testing infrastructure and the `@Component` config object, not the component model itself. The `next_release.stability_penalty: true` flag reflects the concrete testing migration work v5 will impose, but does not indicate a framework rewrite.
+
+### Evidence: Ecosystem tooling facts
+
+**Devtools:**
+
+- Browser DevTools: yes — Web Components output means standard browser custom element inspection works natively. Chrome DevTools shows the custom element, shadow root, and properties.
+- Stencil DevTools browser extension: no dedicated panel beyond standard custom element inspection.
+
+**Test utilities:**
+
+- `@stencil/vitest` — yes, official first-party, actively maintained: `github.com/stenciljs/vitest`. Recommended replacement for integrated runner.
+- `@stencil/playwright` — yes, official first-party: `github.com/stenciljs/playwright`. Recommended for E2E.
+- Legacy integrated Jest runner — yes, but deprecated in v4.43, scheduled for removal in v5.
+- Storybook: community support via `@storybook/web-components` — works because Stencil outputs Web Components.
+
+**IDE / LSP support:**
+
+- TypeScript language server: yes — Stencil is TypeScript-native; all TS IDE features work out of the box in `.tsx` files.
+- `docs-vscode` output target: yes — generates `custom-elements.json` for VS Code `html.customData`, enabling autocomplete on custom element tags in HTML files. Must be explicitly opted in via `stencil.config.ts`.
+- VS Code Stencil Tools extension (`natemoo-re.vscode-stencil-tools`): yes — component generation, decorator snippets, and auto-import support. Available on VS Code Marketplace.
+- WebStorm / JetBrains: standard TypeScript support; no Stencil-specific plugin known.
+
+**Build / CLI:**
+
+- Stencil CLI: yes — `npm init stencil` project scaffold, `stencil generate <name>` for component scaffolding, `stencil build`, `stencil test`, `stencil serve` (dev server with HMR).
+
+**Score: 7.0.** Good test tooling coverage (especially post-v4.43 with official Vitest and Playwright packages). VS Code IntelliSense requires manual opt-in via `docs-vscode` target — not automatic. No dedicated browser DevTools panel. IDE support is TypeScript-baseline (solid) with a community VS Code extension for Stencil-specific affordances (component generation, decorator snippets).
 
 ---
 
-Sources:
-- [Stencil Introduction](https://stenciljs.com/docs/introduction)
-- [Stencil @State Decorator](https://stenciljs.com/docs/state)
-- [Stencil Events](https://stenciljs.com/docs/events)
-- [Stencil Component Lifecycle](https://stenciljs.com/docs/component-lifecycle)
-- [Creating Web Components with Stencil](https://auth0.com/blog/creating-web-components-with-stencil/)
+## On the Horizon
+
+### Next release
+
+- **Name/version:** v5
+- **Status:** rfc (active discussion, no release date announced)
+- **What's changing:** Confirmed: removal of integrated Jest/Puppeteer test runner (migration to `@stencil/vitest` + `@stencil/playwright`); refactored `@Component` decorator API to fix shadow/scoped ambiguity. Under consideration: Rollup-to-Rolldown compiler migration; new features: `extends`, Mixin, `@Prop` get/set, runtime custom decorators. See GitHub issues #6185 and #6584 on `stenciljs/core`.
+- **Anticipated impact:** The test runner removal is the most disruptive change for existing projects. The `@Component` API refactor should improve convention strength (resolves the shadow/scoped ambiguity noted in Convention strength evidence). The core authoring model — decorator-annotated classes, `@State` reassignment rule, `@Event`/`@Listen` communication — is unchanged in all disclosed v5 plans.
+- **Stability penalty:** yes — see `next_release.stability_penalty: true`. The integrated test runner removal is a confirmed breaking change affecting all projects using `--spec` or `--e2e` flags.
+
+### AI-tooling investment
+
+- **What exists:** No official MCP server. No `llms.txt` at `stenciljs.com` (404). No Boost-style AI-facing guidelines package. One community MCP server (`stencil-library-mcp` on LobeHub) that reads Stencil's generated `docs-json` output to expose component APIs to LLMs — this is a generic component-library adapter, not Stencil-framework guidance.
+- **Observed delta:** Running the canonical TodoMVC exercise (derkoe/stencil-todomvc structure) without any tooling active, the model produced correct decorator scaffolding (`@Component`, `@State`, `@Prop`, `@Event`, `@Listen`) on the first attempt. JSX syntax and lifecycle method usage were correct. The recurrent gap: the model generated `this.items.push(newItem)` (which silently fails in Stencil) rather than `this.items = [...this.items, newItem]`. This required one explicit correction. The community MCP server would not have addressed this gap — it exposes component API surfaces, not authoring constraints like the reassignment rule. No AI tooling exists that specifically teaches the `@State` mutation footgun.
