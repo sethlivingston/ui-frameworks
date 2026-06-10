@@ -21,9 +21,21 @@ These fields must be present in every framework review:
 - **docs_url** (string) - Official documentation URL
 - **implementation_language** (string) - Primary implementation language
 - **status** (string) - Current maintenance status
-- **ai_friendliness_score** (number) - AI-friendliness rating (0-10)
-- **reusability_score** (number) - Reusability rating (0-10)
-- **maintainability_score** (number) - Maintainability rating (0-10)
+- **type_system_score** (number or null) - Type-system integration (0-10)
+- **compiler_feedback_score** (number or null) - Compiler/build feedback quality (0-10)
+- **locality_score** (number or null) - Locality of behavior (0-10)
+- **explicitness_score** (number or null) - Explicitness / data-flow traceability (0-10)
+- **convention_strength_score** (number or null) - Convention strength (0-10)
+- **token_efficiency_score** (number or null) - Token efficiency / boilerplate density (0-10)
+- **familiarity_score** (number or null) - Familiarity composite (0-10)
+- **stability_score** (number or null) - Stability / convention durability (0-10)
+- **tooling_score** (number or null) - Ecosystem tooling facts (0-10)
+
+These nine are required-but-nullable: the field must be present so the rubric stays
+complete and queryable, but `null` is permitted so a freshly-scaffolded review can
+validate before evidence-gathering completes. Each non-null score should be backed
+by a `### Evidence: <Dimension Name>` section in the body, linked by naming
+convention (e.g. `locality_score` ↔ `### Evidence: Locality of behavior`).
 
 ## Recommended Fields
 
@@ -32,6 +44,17 @@ These fields should be filled in when applicable:
 - **version** - Current/reviewed version number
 - **type** - More specific type (e.g., "React Framework", "State Machine Library")
 - **npm_package** - NPM package name
+- **components** - Array of technology identifiers, present only on combo files
+  (e.g. `["lit", "preact"]`) — keeps `rg "components:.*lit"` surfacing every file
+  that touches a technology, standalone or paired
+- **next_release** - Tracked, ranking-neutral info about an upcoming release:
+  `{ name, status, changes, anticipated_impact, stability_penalty }`. This is the
+  evidence source the `stability_score` dimension's `### Evidence:` section cites
+- **ai_tooling** - Tracked, ranking-neutral facts about AI-tooling investment:
+  `{ mcp_server: { available, url, party }, guidelines, llms_txt, style_guides,
+  observed_delta }`
+- **supersedes** / **superseded_by** - Framework name or filename references that
+  link a rewrite (e.g. AngularJS → Angular) to its predecessor/successor review
 - **typescript_support** - Level of TypeScript support
 - **license** - Open source license
 - **runtime** - Where the framework can run
@@ -143,11 +166,6 @@ github_url: "https://github.com/facebook/react"
 docs_url: "https://react.dev"
 npm_package: "react"
 
-mcp_server:
-  available: false
-  url: null
-  party: null
-
 # Technical metadata
 implementation_language: "JavaScript"
 typescript_support: "types-package"
@@ -170,10 +188,37 @@ maintainer: "Meta"
 first_released: "2013"
 status: "active"
 
-# Scores
-ai_friendliness_score: 8.0
-reusability_score: 9.0
-maintainability_score: 7.5
+# Rubric scores (0-10, null until evidence-gathering completes)
+type_system_score: 6.0
+compiler_feedback_score: 7.0
+locality_score: 5.5
+explicitness_score: 6.5
+convention_strength_score: 6.0
+token_efficiency_score: 6.5
+familiarity_score: 9.5
+stability_score: 7.0
+tooling_score: 9.0
+
+# On the Horizon (tracked, ranking-neutral)
+next_release:
+  name: "React 19.x"
+  status: "rfc"
+  changes: "Compiler-driven memoization (React Compiler)"
+  anticipated_impact: "Reduces manual useMemo/useCallback boilerplate"
+  stability_penalty: false
+
+ai_tooling:
+  mcp_server:
+    available: false
+    url: null
+    party: null
+  guidelines: null
+  llms_txt: false
+  style_guides: null
+  observed_delta: null
+
+supersedes: null
+superseded_by: null
 
 # Review metadata
 reviewed_date: "2025-12-06"
@@ -192,9 +237,15 @@ github_url: "https://github.com/..."
 docs_url: "https://..."
 implementation_language: "JavaScript"
 status: "active"
-ai_friendliness_score: 7.5
-reusability_score: 8.0
-maintainability_score: 7.5
+type_system_score: null
+compiler_feedback_score: null
+locality_score: null
+explicitness_score: null
+convention_strength_score: null
+token_efficiency_score: null
+familiarity_score: null
+stability_score: null
+tooling_score: null
 ---
 ```
 

@@ -25,12 +25,26 @@ research/
   vue.md
   svelte.md
   solid.md
+  htmx-html.md
+  lit-preact.md
   ...
 schema/
   framework-review.schema.json
 ```
 
 Each framework gets one markdown file. Code examples are inline with syntax highlighting. If you later need separate example files for a specific framework, refactor to nested structure on demand.
+
+**Combo files — naturally-paired technologies:** Some technologies have no coherent
+standalone review (htmx and Alpine.js have no rendering or component model of their
+own — scoring them in isolation would distort the rubric against dimensions that
+don't really exist for them). For these, write **one complete file per pairing**
+(e.g. `htmx-html.md`, `lit-preact.md`, `lit-stencil.md`) — its own full rubric run,
+its own ranking row, scored as the unit a developer actually uses. A technology can
+appear in as many combo files as make sense; there's no "pick the canonical pairing"
+problem. Each combo file sets a `components: ["htmx", "html"]`-style frontmatter
+field listing every technology it covers, so `rg "components:.*lit"` surfaces every
+file that touches a technology — standalone or paired — keeping the corpus
+ripgrep-searchable across both shapes.
 
 **Frontmatter schema (YAML):**
 ```yaml
@@ -43,10 +57,15 @@ category: "full-framework" | "state-library" | "rendering-library" | "reactive-p
 github_url: "https://github.com/facebook/react"
 docs_url: "https://react.dev"
 npm_package: "react"
-mcp_server:
-  available: true/false
-  url: "mcp server package/repo if exists"
-  party: "first-party" | "third-party" | "community" | null
+ai_tooling:
+  mcp_server:
+    available: true/false
+    url: "mcp server package/repo if exists"
+    party: "first-party" | "third-party" | "community" | null
+  guidelines: "curated AI-facing guidelines, e.g. a Laravel-Boost-style package, or null"
+  llms_txt: true/false
+  style_guides: "AI-specific style guides, or null"
+  observed_delta: "what changed running the canonical exercise with vs. without this tooling, or null"
 
 # Technical metadata
 implementation_language: "JavaScript" | "TypeScript" | "Rust" | "Go" | etc.
@@ -69,6 +88,35 @@ rendering_strategy: "virtual-dom" | "fine-grained" | "compiler" | "direct-dom" |
 maintainer: "Meta" | "Vercel" | "Community" | etc.
 first_released: "2013"
 status: "active" | "maintenance" | "deprecated"
+
+# Rubric scores (0-10, or null until evidence-gathering completes — see "Rubric
+# Evidence" in the Review Template; each non-null score pairs with a body
+# `### Evidence: <Dimension Name>` section by naming convention)
+type_system_score: 7.0
+compiler_feedback_score: 7.0
+locality_score: 6.0
+explicitness_score: 6.5
+convention_strength_score: 6.0
+token_efficiency_score: 6.5
+familiarity_score: 9.0
+stability_score: 7.0
+tooling_score: 9.0
+
+# On the Horizon (tracked, ranking-neutral — see "On the Horizon" in the Review
+# Template; next_release is the evidence source the Stability dimension cites)
+next_release:
+  name: "..."
+  status: "alpha" | "beta" | "rfc" | "announced" | null
+  changes: "..."
+  anticipated_impact: "..."
+  stability_penalty: true/false
+
+# Combo files only (see "Documentation Structure" below)
+components: ["lit", "preact"]
+
+# Rewrite-detection links (the Angular 1->2 problem)
+supersedes: "framework-name-or-filename" | null
+superseded_by: "framework-name-or-filename" | null
 
 # Review metadata
 reviewed_date: "YYYY-MM-DD"
@@ -110,7 +158,6 @@ On top of the per-framework reviews, the repo root holds a small set of synthesi
 - **README.md** - Entry point pointing visitors to the right document for what they need.
 - **AGENTIC-DEV-RANKINGS.md** - Ranks the reviewed frameworks/libraries for agentic development. Designed to be re-run periodically (its own Methodology section explains how) so that v1, v2, v3, etc. stay comparable over time.
 - **NEXT-GEN-FRAMEWORK.md** - Design principles for an AI-first UI framework, synthesized from the reviews.
-- **LANGUAGE-DESIGN.md** - A companion language proposal (StrictTS) for pairing with the framework design.
 
 **Writing guidance for these (and any future periodically-updated synthesis doc):** because they get revisited and re-run every several months, avoid prose that's tied to the moment it was written:
 - No hardcoded counts that will drift ("24 frameworks," "18 entries") - reference the directory or describe the set instead.
@@ -169,12 +216,6 @@ How do you compute values from existing state?
 - **DevTools:** [what's available for inspection/debugging]
 - **Debugging:** [how easy to trace state changes]
 - **Time travel:** [yes/no/with-utility]
-
-### AI-Friendly Assessment
-- What makes this approach easy/hard for AI to work with?
-- Explicitness vs implicit magic
-- Locality of behavior (can you understand state by reading one file?)
-- Predictability of data flow
 ```
 
 ### Rendering
@@ -218,11 +259,6 @@ What's available to optimize rendering?
 - **Learning curve:** [easy/medium/hard with explanation]
 - **DevTools:** [component inspection, render tracking, etc.]
 - **Hot reload:** [support and quality]
-
-### AI-Friendly Assessment
-- How explicit is the render boundary?
-- Can you predict what will render by reading code?
-- How much framework-specific knowledge is required?
 ```
 
 ### Event Handling
@@ -267,32 +303,121 @@ What should you know about event performance?
 ### Developer Experience
 - **Debugging:** [how to debug event issues]
 - **Type safety:** [event typing support]
-
-### AI-Friendly Assessment
-- How explicit is event wiring?
-- Can you find all handlers for an element by reading code?
-- How much magic vs explicitness?
 ```
 
-### Overall Assessment
+### Rubric Evidence
+
+Score once per framework, flat — not once per capability area. A real feature (a
+counter, a todo list with add/remove) inherently crosses state → render → event
+boundaries, so the evidence-gathering the rubric specifies (trace a feature, trace a
+state change end-to-end) is cross-cutting by nature; per-area scoring would impose an
+artificial boundary that doesn't match how the evidence is actually collected.
+
+**Score lives in frontmatter, evidence lives in the body, linked by naming
+convention** — frontmatter key `locality_score` pairs with body heading `### Evidence:
+Locality of behavior` purely by matching names (no literal pointer field, which would
+itself go stale the moment someone edits the doc). This is the whole mechanism behind
+`rg -A 5 "Evidence: Locality"`-style queries and the `frontmatter score ↔ body
+Evidence section` pairing — a naming mismatch silently breaks both. **Derive these
+heading names directly from the `*_score` field list in
+`schema/framework-review.schema.json`** — don't re-derive them independently from any
+other prose description of the rubric (that would create exactly the
+two-places-that-can-drift situation this file already warns against elsewhere).
 
 ```markdown
-## AI-Assisted Development Considerations
+## Rubric Evidence
 
-### What Works Well with AI
-- [Patterns that are explicit and predictable]
-- [Good locality of behavior]
-- [Clear cause and effect]
+### Evidence: Type-system integration
+Categorical fact (native/types-package/community/none) + a sample type error.
+[What does the type checker actually catch? Show a deliberate type mistake and the
+error it produces.]
 
-### What Creates Friction
-- [Implicit behavior or magic]
-- [Action at a distance]
-- [Framework-specific mental models]
+### Evidence: Compiler/build feedback quality
+Write a deliberately-broken example, capture the real error message.
+[Paste the actual error transcript. Is it actionable? Does it point at the real
+cause or somewhere else?]
 
-### Opportunities for Improvement
-- [What could make this more AI-friendly?]
-- [What human-era constraints could be removed?]
+### Evidence: Locality of behavior
+Trace a representative feature, count the touchpoints.
+[Pick one real feature (e.g. a counter or todo list). List every file/concept you
+had to open to understand or change it, and the count.]
+
+### Evidence: Explicitness / data-flow traceability
+Trace one state change end-to-end, count implicit vs. explicit hops.
+[Walk a single user action from trigger to render. For each hop, is it an explicit
+call you can follow, or implicit framework magic?]
+
+### Evidence: Convention strength
+Grep docs/examples for alternative approaches to one canonical task, count them.
+[Pick one common task (e.g. "fetch data on mount"). How many different
+idiomatic-looking ways does the ecosystem actually do it?]
+
+### Evidence: Token efficiency / boilerplate density
+Implement (or cite) a canonical feature, count lines/tokens. Prefer a TodoMVC-style
+canonical reference implementation when one exists — these are written and vetted by
+people who know the framework well, building to an identical spec, which is far more
+apples-to-apples than a freehand attempt. Only write a fresh minimal implementation
+when no canonical reference exists, following the official style guide/idioms as
+closely as possible.
+[Cite the source (canonical repo or your own implementation + the style guide you
+followed) and the line/token count.]
+
+### Evidence: Familiarity composite
+Age-weighted SO/community volume + GitHub activity + ecosystem-appropriate registry
+trend (direction, not magnitude) + `first_released`. Note any structural undercount
+(e.g. CDN/script-tag-distributed tools like htmx/Alpine.js whose registry numbers
+don't reflect real usage — lean on GitHub stars/community volume for those).
+[Show the four proxies and how they triangulate into the score.]
+
+### Evidence: Stability / convention durability
+Check changelog/roadmap/RFCs for announced breaking changes, cite + categorize. This
+is the one dimension that should explicitly cite the framework's `next_release`
+frontmatter — one source of truth for "this is mid-rewrite," rather than two
+disconnected places asserting the same thing.
+[Cite the changelog/roadmap/RFC entry. State whether it triggers the
+`next_release.stability_penalty` flag and why.]
+
+### Evidence: Ecosystem tooling facts
+Checklist: yes/no + links — devtools, test utilities, IDE/LSP support.
+[List what exists, with links. This is verification-side infrastructure, distinct
+from the AI-tooling investment tracked in "On the Horizon" below.]
 ```
+
+### On the Horizon
+
+Tracked, surfaced, but **ranking-neutral** — these facts matter for understanding
+where a framework is headed and what AI-tooling investment looks like today, but
+neither should move the rubric scores directly (next-release info already feeds the
+Stability dimension's evidence above; AI-tooling investment is tracked as an observed
+fact, not weighted — see the brief in `.claude/agents/framework-researcher.md` for
+why).
+
+```markdown
+## On the Horizon
+
+### Next release
+- **Name/version:** [what's coming]
+- **Status:** alpha | beta | rfc | announced
+- **What's changing:** [summary]
+- **Anticipated impact:** [how this could change the rubric evidence above]
+- **Stability penalty:** yes/no — [why, linking back to the Stability evidence]
+
+### AI-tooling investment
+- **What exists:** [official MCP server, curated guidelines (Boost-style), `llms.txt`,
+  AI-specific style guides — link each]
+- **Observed delta:** [run the canonical exercise from "Token efficiency" once with
+  this tooling active and once without; record what actually changed — not just
+  whether the tooling exists]
+```
+
+**Note documentation friction explicitly when it shapes evidence-gathering** — e.g.
+"spent unusual effort locating the canonical state-update pattern; docs were
+scattered across three guides with conflicting examples." Doc quality diffuses into
+the evidence for several dimensions (convention strength via grepping docs, stability
+via changelogs, code samples requiring docs to be idiomatic) rather than getting its
+own rubric slot — but that argument only holds if friction actually shows up in the
+evidence instead of being silently smoothed over by an agent that just tries harder
+until it finds the answer. Calling it out explicitly is what keeps it visible.
 
 Consistent structure enables AI to quickly locate specific information across all framework reviews.
 
@@ -300,12 +425,34 @@ Consistent structure enables AI to quickly locate specific information across al
 
 When documenting a new framework:
 1. Read official documentation and source code
-2. Create practical examples demonstrating each capability
-3. Rate AI-friendliness based on:
-   - Explicitness over implicitness
-   - Locality of behavior
-   - Predictability of patterns
-   - Amount of boilerplate
-   - Debugging clarity
+2. Create practical examples demonstrating each capability — prefer a canonical
+   reference implementation (TodoMVC-style) where one exists; see "Token efficiency"
+   in the Rubric Evidence template
+3. Score the framework against the 9-dimension flat rubric and write the evidence —
+   see the `## Rubric Evidence` section of the Review Template above for the
+   dimension list and what artifact each one needs (the canonical table lives in
+   `AGENTIC-DEV-RANKINGS.md`'s methodology — don't re-derive the dimension list here)
 4. Document anti-patterns from human-era thinking
 5. Identify transferable patterns for next-gen framework
+
+For the full research-agent brief — including the initial-vs-follow-on decision gate,
+verification-as-front-half-of-follow-on, and the AI-tooling delta-capture protocol —
+see `.claude/agents/framework-researcher.md`.
+
+## Ongoing Maintenance
+
+Two user-invocable skills keep the corpus current; each skill's `SKILL.md` owns its
+process detail — this is just the map:
+
+- **`/corpus-sweep`** (`.claude/skills/corpus-sweep/`) — periodic (~6-month)
+  detection pass: coverage gaps vs. the current landscape, plus mechanical staleness
+  checks (old `reviewed_date`, version drift vs. registries, tracked `next_release`s
+  that have shipped). Produces a findings file for human review; never dispatches
+  research itself.
+- **`/refresh-reviews`** (`.claude/skills/refresh-reviews/`) — runs an accepted
+  refresh queue: batched, sequential `framework-researcher` follow-on passes, with
+  per-batch pipeline runs, spot-checks, and commits.
+
+Sweeps feed refreshes; a refresh ends by recommending (not running) a rankings pass
+when scores moved enough to matter — `AGENTIC-DEV-RANKINGS.md`'s Methodology section
+is the canonical runbook for that.

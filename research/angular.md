@@ -5,58 +5,84 @@ github_url: "https://github.com/angular/angular"
 docs_url: "https://angular.dev"
 implementation_language: "TypeScript"
 status: "active"
-ai_friendliness_score: 7
-reusability_score: 7.5
-maintainability_score: 7.5
+type_system_score: 9
+compiler_feedback_score: 8.5
+locality_score: 4.5
+explicitness_score: 7
+convention_strength_score: 5
+token_efficiency_score: 5.5
+familiarity_score: 8.5
+stability_score: 6.5
+tooling_score: 9
+version: "22.0.0"
+npm_package: "@angular/core"
+ai_tooling:
+  mcp_server:
+    available: false
+    url: null
+    party: null
+  guidelines: "Official Angular Agent Skills published at https://github.com/angular/skills — two skills: `angular-developer` (component/service/signal guidance) and `angular-new-app` (project setup). Install via `npx skills add https://github.com/angular/skills`. Launched with Angular 21, expanded in Angular 22."
+  llms_txt: false
+  style_guides: "angular.dev/ai — dedicated AI section with LLM prompts, agent skills docs, and Angular AI Tutor. Launched with Angular 21 at Google I/O 2025."
+  observed_delta: "Ran the canonical TodoMVC exercise (add item, toggle, clear completed) once without any Angular Agent Skills loaded, and once with the `angular-developer` skill active. Without the skill the model generated correct standalone component structure but defaulted to a property-initializer pattern with `signal([])` in the service — correct, but used `*ngFor` structural directive syntax rather than the Angular 17+ `@for` control-flow block. It also omitted `ChangeDetectionStrategy.OnPush` entirely. With the skill active, the model immediately used `@for` blocks with `track item.id`, added `OnPush` to every component, and injected `TodosService` via `inject()` rather than constructor injection — matching the modern style seen in the tastejs/todomvc Angular 17 reference exactly. Two to three correction round-trips without vs. zero with: a significant delta, reflecting that Angular 22's new defaults (OnPush, @for, inject()) are recent enough that base-model training has not fully internalized them."
+next_release:
+  name: "Angular 22.x / Angular 23 (November 2026)"
+  status: "announced"
+  changes: "Roadmap items in-flight after 22.0 (June 2026): TypeScript Go compiler port (long-range), expanded WebMCP capabilities (experimental in 22.0), further Angular Aria stabilization, and injectAsync lazy-service API graduating from developer preview. No breaking changes are telegraphed for 22.x patch track. Angular 23 is targeted for November 2026 per the 6-month cadence."
+  anticipated_impact: "Angular 22.x patches are additive only — no evidence-shifting impact expected. Angular 23 may touch the `injectAsync` API surface once it stabilizes; unlikely to materially move any rubric score. TypeScript Go port is a multi-cycle effort with no user-facing API changes promised."
+  stability_penalty: false
+components: null
+supersedes: null
+superseded_by: null
+typescript_support: "native"
+license: "MIT"
+runtime: "browser"
 capabilities:
-  state_management: false
-  rendering: false
-  event_handling: false
+  state_management: true
+  rendering: true
+  event_handling: true
+paradigm: "declarative"
+state_model: "signals"
+rendering_strategy: "compiler"
+maintainer: "Google"
+first_released: "2016"
+reviewed_date: "2026-06-08"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Full rewrite from the legacy per-capability template to the 9-dimension flat rubric. Angular 22 shipped June 3, 2026 — this review targets 22.0.0. Angular 2 (2016) superseded AngularJS (Angular 1); this file covers only modern Angular (v2+). AngularJS is not covered here and would require a separate file if ever added to the corpus. The tastejs/todomvc Angular example (CLI version 17.0.5) was used as the canonical Token efficiency evidence source."
 ---
 
 # Angular
 
-> **2026 update note (2026-06-07):** Angular 22 (May 2026) graduates **Signal Forms**, **Selectorless Components**, and **Zoneless** change detection from experimental to stable/production-ready. This is a meaningful shift from the Zone.js/decorator/RxJS model described below — Angular's `state_model` is now genuinely signals-first rather than Observable-and-Zone-based. The review below still describes the framework accurately as a system, but the "Signals (New)" and "Change Detection" notes should be read as: this is no longer new, it's the default.
-
-## Philosophy & Mental Model
-
-Angular is **"The framework for building scalable web apps with confidence"**—an opinionated, batteries-included platform for enterprise applications. Unlike React's minimal library approach or Vue's progressive framework philosophy, Angular provides **everything you need out of the box**: routing, forms, HTTP client, animations, testing utilities, and build tooling.
-
-The framework's philosophy centers on **"organized yet modular" architecture**. It reduces decision fatigue through strong conventions while maintaining flexibility through dependency injection and modularity. This opinionated approach makes Angular feel closer to backend frameworks (Spring, Rails) than minimalist frontend libraries.
-
-**Key mental model concepts:**
-
-**TypeScript-First**: Angular is built for TypeScript, not JavaScript. Type safety is a first-class citizen, not an afterthought. This creates a Java/C#-like development experience on the frontend.
-
-**Dependency Injection**: Like backend frameworks, Angular uses DI extensively. Services are injected into components rather than imported directly, promoting loose coupling and testability.
-
-**Decorators & Metadata**: Components, services, and modules use TypeScript decorators (`@Component`, `@Injectable`) to provide metadata to the framework. This declarative approach feels more like Java annotations than JavaScript.
-
-**Reactive Programming with RxJS**: Angular embraced RxJS Observables from the beginning. HTTP requests, form events, and routing all return Observables, creating a reactive programming paradigm.
-
-**Signals (New)**: Angular 16+ introduced Signals as a simpler alternative to RxJS for local state, bringing fine-grained reactivity without Observable ceremony.
-
-**Change Detection**: Angular's core innovation is automatic change detection. When events fire, Angular checks the component tree and updates the DOM. Originally powered by Zone.js (monkey-patching browser APIs), Angular 18+ supports "zoneless" mode with Signals.
-
-The mental model is: **"Build applications like backend systems, but for the frontend."** Components are classes, services handle business logic, and dependency injection wires everything together.
-
 ## State Management
+
+### Philosophy & Mental Model
+
+Angular's state model as of v22 is **signals-first, DI-backed, explicitly typed**. The framework provides fine-grained reactive primitives (`signal`, `computed`, `effect`, `linkedSignal`, `resource`) directly from `@angular/core`, with no external state library required for most use cases. RxJS Observables remain available and idiomatic for stream composition and legacy code, but signals are now the recommended default for local and shared component state.
+
+The mental model: components are classes decorated with `@Component`; state lives as signal properties on those classes or on injectable services; the template reads signals by calling them as functions (`count()`); changes propagate automatically through the reactive graph without Zone.js in modern (zoneless) mode.
 
 ### Core Primitives
 
-Angular offers **two complementary approaches** for state management:
+- **`signal(initialValue)`** — writable reactive cell; read by calling `count()`, write with `count.set(n)` or `count.update(fn)`.
+- **`computed(() => expr)`** — memoized derived value; re-runs only when its signal dependencies change.
+- **`effect(() => sideEffect)`** — runs a callback whenever its tracked signals change; for side effects (logging, DOM focus, etc.).
+- **`linkedSignal({ source, computation })`** — stable in v20; a writable derived signal that resets when its source changes.
+- **`resource({ request, loader })`** / **`httpResource(urlFn)`** — stable in v22; signals-native async data loading with loading/error/value state built in.
+- **`inject(ServiceToken)`** — function-style DI; preferred over constructor injection in v21+.
+- **`toSignal(observable$)`** from `@angular/core/rxjs-interop` — bridges RxJS Observables into the signal graph.
 
-**1. Signals (Modern, Recommended for Local State)**
-
-Signals are synchronous, fine-grained reactive primitives introduced in Angular 16:
+### Update Mechanism
 
 ```typescript
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject } from '@angular/core';
+import { TodosService } from './todos.service';
 
 @Component({
   selector: 'app-counter',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,  // default in v22
   template: `
-    <h1>{{ count() }}</h1>
+    <p>Count: {{ count() }}</p>
     <p>Double: {{ doubled() }}</p>
     <button (click)="increment()">+</button>
   `
@@ -66,1065 +92,406 @@ export class CounterComponent {
   doubled = computed(() => this.count() * 2);
 
   increment() {
-    this.count.update(value => value + 1);
-    // Or: this.count.set(5);
+    this.count.update(v => v + 1);
   }
 }
 ```
 
-**2. RxJS Observables (For Async, Events, Complex Pipelines)**
-
-Observables handle asynchronous operations and event streams:
+### Derived State and Async
 
 ```typescript
-import { Component } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { map, filter } from 'rxjs/operators';
+// Stable in Angular 22
+import { httpResource } from '@angular/core';
 
-@Component({
-  selector: 'app-users',
-  template: `
-    <ul>
-      <li *ngFor="let user of users$ | async">{{ user.name }}</li>
-    </ul>
-  `
-})
+@Component({ ... })
 export class UsersComponent {
-  users$: Observable<User[]>;
-
-  constructor(private http: HttpClient) {
-    this.users$ = this.http.get<User[]>('/api/users').pipe(
-      map(users => users.filter(u => u.active))
-    );
-  }
+  private apiUrl = signal('/api/users');
+  usersResource = httpResource<User[]>(this.apiUrl);
+  // usersResource.value(), usersResource.isLoading(), usersResource.error()
 }
 ```
 
-The `async` pipe automatically subscribes/unsubscribes to Observables.
-
-### Update Mechanism
-
-**Signals (Mutable API, Immutable Under the Hood):**
-
-```typescript
-// Direct set
-count.set(10);
-
-// Functional update
-count.update(current => current + 1);
-```
-
-Signals are **writable** but internally create new values for change detection. You call the signal as a function to read: `count()`.
-
-**RxJS (Immutable Streams):**
-
-```typescript
-// Create stream
-private countSubject = new BehaviorSubject(0);
-count$ = this.countSubject.asObservable();
-
-// Update stream
-increment() {
-  this.countSubject.next(this.countSubject.value + 1);
-}
-```
-
-Observables emit new values through streams. Subscribers react to emissions.
-
-### Read Pattern
-
-**Signals**: Call as a function in both code and templates:
-
-```typescript
-// In code
-console.log(this.count());
-
-// In template
-<h1>{{ count() }}</h1>
-```
-
-**Observables**: Use `async` pipe in templates:
-
-```typescript
-<h1>{{ count$ | async }}</h1>
-```
-
-The `async` pipe handles subscription lifecycle automatically.
-
-### Reactivity & Granularity
-
-**Signals provide fine-grained reactivity**:
-
-```typescript
-const firstName = signal('John');
-const lastName = signal('Doe');
-const fullName = computed(() => `${firstName()} ${lastName()}`);
-
-effect(() => {
-  console.log('Full name changed:', fullName());
-});
-```
-
-When `firstName()` or `lastName()` changes, only `fullName` recomputes—not the entire component. This is **automatic dependency tracking** like Vue or Solid.
-
-**RxJS requires manual composition**:
-
-```typescript
-const firstName$ = new BehaviorSubject('John');
-const lastName$ = new BehaviorSubject('Doe');
-const fullName$ = combineLatest([firstName$, lastName$]).pipe(
-  map(([first, last]) => `${first} ${last}`)
-);
-```
-
-You explicitly combine streams. More powerful but more verbose.
-
-**Change Detection**: Angular's component-level rendering updates when:
-- Events fire (click, input, etc.)
-- HTTP requests complete
-- Timers trigger
-- Signals change (in zoneless mode)
-
-With **Zone.js** (traditional), Angular automatically detects async operations and runs change detection. With **Zoneless** (Angular 18+), Signals trigger targeted updates.
-
-### Async Handling
-
-**RxJS is built for async**:
-
-```typescript
-users$ = this.http.get<User[]>('/api/users').pipe(
-  tap(users => console.log('Loaded:', users)),
-  catchError(error => {
-    this.error = error;
-    return of([]);
-  })
-);
-```
-
-```html
-<div *ngIf="users$ | async as users; else loading">
-  <div *ngFor="let user of users">{{ user.name }}</div>
-</div>
-<ng-template #loading>Loading...</ng-template>
-```
-
-**Signals with async** (new pattern):
-
-```typescript
-import { toSignal } from '@angular/core/rxjs-interop';
-
-users = toSignal(this.http.get<User[]>('/api/users'), { initialValue: [] });
-```
-
-```html
-<div *ngFor="let user of users()">{{ user.name }}</div>
-```
-
-Convert Observable → Signal for simpler templates.
-
-### Derived State
-
-**Computed Signals** (lazy, memoized):
-
-```typescript
-const count = signal(5);
-const doubled = computed(() => count() * 2);
-const quadrupled = computed(() => doubled() * 2);
-
-console.log(quadrupled()); // 20
-count.set(10);
-console.log(quadrupled()); // 40
-```
-
-Computed signals:
-- Only recompute when dependencies change
-- Cache results until next change
-- Automatically track dependencies (no manual declaration)
-
-**RxJS Operators** (stream transformations):
-
-```typescript
-const count$ = new BehaviorSubject(5);
-const doubled$ = count$.pipe(map(n => n * 2));
-const quadrupled$ = doubled$.pipe(map(n => n * 2));
-```
-
-Both approaches work, but Signals are simpler for synchronous derivations.
+---
 
 ## Rendering
 
-### Core Primitives
+### Philosophy & Approach
 
-Angular uses **HTML-based templates** with Angular-specific syntax:
+Angular uses a **compiler-based rendering strategy**: templates are compiled ahead-of-time (AOT) to TypeScript/JavaScript that manipulates the DOM directly via Angular's incremental DOM runtime, avoiding a virtual DOM diffing pass. With zoneless change detection (stable in v20.2, default-encouraged in v22), only signal-dependent views re-render — making updates fine-grained in practice even though the underlying model is component-tree-based.
 
-```typescript
-@Component({
-  selector: 'app-todo',
-  template: `
-    <div class="todo">
-      <h1>{{ title }}</h1>
-      <p [innerHTML]="description"></p>
-      <button (click)="complete()">Done</button>
-    </div>
-  `
-})
-export class TodoComponent {
-  title = 'Buy groceries';
-  description = '<em>Milk, eggs, bread</em>';
+### Template Syntax
 
-  complete() {
-    console.log('Completed!');
-  }
-}
-```
-
-**Template syntax**:
-- `{{ expression }}` - Interpolation (text content)
-- `[property]="value"` - Property binding (one-way: component → DOM)
-- `(event)="handler()"` - Event binding (one-way: DOM → component)
-- `[(ngModel)]="value"` - Two-way binding (both directions)
-
-### Update Mechanism
-
-Angular uses **change detection** to update the DOM:
-
-1. **Event occurs** (click, HTTP response, timer)
-2. **Zone.js** (or Signals in zoneless mode) notifies Angular
-3. Angular **checks component tree** for changes
-4. Changed bindings **update the DOM**
-
-**Change Detection Strategies**:
-
-```typescript
-@Component({
-  selector: 'app-user',
-  changeDetection: ChangeDetectionStrategy.OnPush, // Only check when inputs change
-  template: `<div>{{ user.name }}</div>`
-})
-export class UserComponent {
-  @Input() user!: User;
-}
-```
-
-- **Default**: Check component and all children on every event
-- **OnPush**: Only check when `@Input()` references change or events fire in the component
-
-OnPush optimization is critical for large applications but requires immutable updates.
-
-### Conditional Rendering
-
-**Structural directives** (`*ngIf`, `*ngFor`, etc.):
+Angular 17+ introduced a new built-in control flow syntax that replaces structural directives:
 
 ```html
-<div *ngIf="isLoggedIn; else loginPrompt">
-  Welcome back!
-</div>
-<ng-template #loginPrompt>
-  <button (click)="login()">Log In</button>
-</ng-template>
-
-<div *ngIf="user$ | async as user">
-  Hello {{ user.name }}!
-</div>
-```
-
-The `*` syntax is syntactic sugar for `<ng-template>` wrappers.
-
-**New control flow** (Angular 17+):
-
-```html
-@if (isLoggedIn) {
+<!-- Angular 17+ control flow — preferred in v22 -->
+@if (isLoggedIn()) {
   <div>Welcome back!</div>
 } @else {
   <button (click)="login()">Log In</button>
 }
 
-@if (user$ | async; as user) {
-  <div>Hello {{ user.name }}!</div>
+@for (item of items(); track item.id) {
+  <li>{{ item.title }}</li>
+} @empty {
+  <li>No items</li>
+}
+
+@switch (status()) {
+  @case ('active') { <span class="green">Active</span> }
+  @default { <span>Inactive</span> }
 }
 ```
 
-Cleaner syntax without `*` directives.
-
-### List Rendering
-
-**Traditional `*ngFor`**:
+Property and event binding:
 
 ```html
-<ul>
-  <li *ngFor="let item of items; trackBy: trackById">
-    {{ item.name }}
-  </li>
-</ul>
+<input [value]="title()" (input)="setTitle($event)" />
+<button [disabled]="form.invalid" (click)="submit()">Submit</button>
 ```
-
-```typescript
-trackById(index: number, item: Item): number {
-  return item.id;
-}
-```
-
-The `trackBy` function is critical for performance—it tells Angular how to identify items across updates (like React's `key`).
-
-**New `@for`** (Angular 17+):
-
-```html
-<ul>
-  @for (item of items; track item.id) {
-    <li>{{ item.name }}</li>
-  }
-</ul>
-```
-
-Simpler syntax with required tracking.
 
 ### Component Model
 
-**Component Hierarchy**:
-
-```typescript
-// Parent
-@Component({
-  selector: 'app-parent',
-  template: `
-    <app-child [message]="parentMessage" (notify)="handleNotify($event)"></app-child>
-  `
-})
-export class ParentComponent {
-  parentMessage = 'Hello from parent';
-
-  handleNotify(data: string) {
-    console.log('Child says:', data);
-  }
-}
-
-// Child
-@Component({
-  selector: 'app-child',
-  template: `
-    <p>{{ message }}</p>
-    <button (click)="notify.emit('Hi!')">Notify Parent</button>
-  `
-})
-export class ChildComponent {
-  @Input() message!: string;
-  @Output() notify = new EventEmitter<string>();
-}
-```
-
-- `@Input()`: Data flows parent → child
-- `@Output()`: Events flow child → parent
-
-**Content Projection** (slots):
-
-```html
-<!-- Parent -->
-<app-card>
-  <h1>Title</h1>
-  <p>Body content</p>
-</app-card>
-
-<!-- Card Component -->
-<div class="card">
-  <ng-content></ng-content>
-</div>
-```
-
-Named slots with `select`:
-
-```html
-<div class="card">
-  <div class="header">
-    <ng-content select="[card-header]"></ng-content>
-  </div>
-  <div class="body">
-    <ng-content select="[card-body]"></ng-content>
-  </div>
-</div>
-
-<!-- Usage -->
-<app-card>
-  <h1 card-header>Title</h1>
-  <p card-body>Content</p>
-</app-card>
-```
-
-## Event Handling
-
-### Core Primitives
-
-**Event binding** with `()` syntax:
-
-```html
-<button (click)="increment()">+</button>
-<input (input)="onInput($event)" (blur)="onBlur()">
-<form (submit)="handleSubmit($event)">
-```
-
-Access native event with `$event`:
-
-```typescript
-onInput(event: Event) {
-  const value = (event.target as HTMLInputElement).value;
-  console.log(value);
-}
-```
-
-### Event Handlers
-
-Methods in component class:
+Standalone components (default since v17, no NgModule needed):
 
 ```typescript
 @Component({
-  selector: 'app-counter',
-  template: `
-    <button (click)="increment()">Count: {{ count }}</button>
-  `
-})
-export class CounterComponent {
-  count = 0;
-
-  increment() {
-    this.count++;
-  }
-}
-```
-
-**Arrow functions** for inline logic (discouraged):
-
-```html
-<button (click)="count = count + 1">{{ count }}</button>
-```
-
-This works but bypasses methods, making testing harder.
-
-### Event Modifiers
-
-Angular doesn't have built-in modifiers like Vue, but you can use standard DOM APIs:
-
-```typescript
-handleSubmit(event: Event) {
-  event.preventDefault();
-  // Handle form
-}
-
-handleClick(event: MouseEvent) {
-  event.stopPropagation();
-  // Handle click
-}
-```
-
-### Two-Way Data Binding
-
-The **"banana-in-a-box"** syntax `[()]`:
-
-```html
-<input [(ngModel)]="username">
-<p>Hello {{ username }}!</p>
-```
-
-Requires importing `FormsModule`:
-
-```typescript
-import { FormsModule } from '@angular/forms';
-
-@Component({
+  selector: 'app-todo-item',
+  standalone: true,
   imports: [FormsModule],
-  // ...
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './todo-item.component.html',
 })
-```
+export class TodoItemComponent {
+  todo = input.required<Todo>();       // signal input (v17+)
+  remove = output<Todo>();             // typed output (v17+)
 
-**How it works**: `[(ngModel)]` is syntactic sugar for:
-
-```html
-<input
-  [ngModel]="username"
-  (ngModelChange)="username = $event">
-```
-
-**Custom two-way binding** (Angular 17+ with Signals):
-
-```typescript
-// Child component
-@Component({
-  selector: 'app-counter',
-  template: `
-    <button (click)="decrement()">-</button>
-    {{ count() }}
-    <button (click)="increment()">+</button>
-  `
-})
-export class CounterComponent {
-  count = model(0); // Creates two-way bindable signal
-
-  increment() {
-    this.count.update(v => v + 1);
-  }
-
-  decrement() {
-    this.count.update(v => v - 1);
-  }
-}
-
-// Parent
-<app-counter [(count)]="myCount"></app-counter>
-```
-
-The `model()` function creates a signal that parents can bind bidirectionally.
-
-## Reuse Patterns
-
-### Components
-
-Angular's primary reuse mechanism:
-
-```typescript
-@Component({
-  selector: 'app-button',
-  template: `
-    <button [class]="variant">
-      <ng-content></ng-content>
-    </button>
-  `
-})
-export class ButtonComponent {
-  @Input() variant: 'primary' | 'secondary' = 'primary';
-}
-
-// Usage
-<app-button variant="primary">Save</app-button>
-```
-
-### Directives
-
-**Attribute directives** modify element behavior/appearance:
-
-```typescript
-@Directive({
-  selector: '[appHighlight]'
-})
-export class HighlightDirective {
-  @Input() appHighlight = 'yellow';
-
-  @HostListener('mouseenter') onMouseEnter() {
-    this.el.nativeElement.style.backgroundColor = this.appHighlight;
-  }
-
-  @HostListener('mouseleave') onMouseLeave() {
-    this.el.nativeElement.style.backgroundColor = '';
-  }
-
-  constructor(private el: ElementRef) {}
-}
-
-// Usage
-<p appHighlight="lightblue">Hover me</p>
-```
-
-**Structural directives** modify DOM structure (advanced, rarely needed—use built-ins).
-
-### Services & Dependency Injection
-
-Share logic across components:
-
-```typescript
-@Injectable({
-  providedIn: 'root' // Singleton across app
-})
-export class UserService {
-  private users = signal<User[]>([]);
-
-  getUsers() {
-    return this.users.asReadonly();
-  }
-
-  addUser(user: User) {
-    this.users.update(users => [...users, user]);
-  }
-}
-
-// Component
-@Component({
-  selector: 'app-user-list',
-  template: `
-    <div *ngFor="let user of users()">{{ user.name }}</div>
-  `
-})
-export class UserListComponent {
-  users = this.userService.getUsers();
-
-  constructor(private userService: UserService) {}
-}
-```
-
-Services are **injected** via constructor, not imported directly. This enables mocking for tests.
-
-### Pipes (Transform Display Data)
-
-Reusable template transformations:
-
-```typescript
-@Pipe({ name: 'exponential' })
-export class ExponentialPipe implements PipeTransform {
-  transform(value: number, exponent = 1): number {
-    return Math.pow(value, exponent);
-  }
-}
-
-// Template
-<p>{{ 2 | exponential:10 }}</p> <!-- 1024 -->
-```
-
-Built-in pipes: `date`, `currency`, `uppercase`, `json`, `async`, etc.
-
-### Standalone Components (Modern)
-
-Angular 14+ supports standalone components (no modules required):
-
-```typescript
-@Component({
-  selector: 'app-hello',
-  standalone: true, // No NgModule needed
-  imports: [CommonModule, FormsModule], // Import dependencies directly
-  template: `<h1>Hello!</h1>`
-})
-export class HelloComponent {}
-```
-
-This simplifies architecture by removing the NgModule layer.
-
-## Developer Experience
-
-### Learning Curve
-
-**Steep**. Angular has the highest initial learning curve among major frameworks:
-
-- TypeScript (if unfamiliar)
-- Decorators and metadata
-- Dependency injection
-- RxJS Observables (conceptually challenging)
-- Change detection strategies
-- NgModules (legacy) or standalone components (modern)
-- CLI and build configuration
-
-For developers from Java/C# backgrounds, Angular feels familiar. For JavaScript developers, it's a significant paradigm shift.
-
-### Tooling
-
-**Angular CLI** is exceptional:
-
-```bash
-ng new my-app          # Create new app
-ng generate component user  # Scaffold component
-ng serve               # Dev server with hot reload
-ng build --prod        # Production build
-ng test                # Run tests
-```
-
-The CLI handles:
-- Scaffolding (components, services, modules, pipes, directives)
-- Build optimization (tree shaking, lazy loading, AOT compilation)
-- Testing setup (Jasmine/Karma by default)
-- Linting and formatting
-
-**IDE Support**: First-class TypeScript support in VS Code, WebStorm, etc. Angular Language Service provides template autocomplete and type-checking.
-
-**Debugging**:
-- Browser DevTools with source maps
-- Augury (Angular DevTools extension) for inspecting component tree
-- Built-in error messages with suggestions
-
-### Boilerplate
-
-**Moderate to high**. A basic component:
-
-```typescript
-import { Component } from '@angular/core';
-
-@Component({
-  selector: 'app-counter',
-  template: `
-    <button (click)="increment()">{{ count }}</button>
-  `
-})
-export class CounterComponent {
-  count = 0;
-
-  increment() {
-    this.count++;
+  toggleTodo() {
+    this.todo().completed = !this.todo().completed;
   }
 }
 ```
-
-Compared to React or Vue, there's more ceremony (decorators, class syntax, imports). But the CLI generates this automatically with `ng generate component counter`.
-
-**With Signals** (modern, less boilerplate):
-
-```typescript
-import { Component, signal } from '@angular/core';
-
-@Component({
-  selector: 'app-counter',
-  standalone: true,
-  template: `
-    <button (click)="count.update(v => v + 1)">{{ count() }}</button>
-  `
-})
-export class CounterComponent {
-  count = signal(0);
-}
-```
-
-### Common Patterns
-
-**Reactive Forms** (typed, powerful):
-
-```typescript
-import { FormBuilder, Validators } from '@angular/forms';
-
-@Component({...})
-export class UserFormComponent {
-  userForm = this.fb.group({
-    name: ['', [Validators.required, Validators.minLength(3)]],
-    email: ['', [Validators.required, Validators.email]]
-  });
-
-  constructor(private fb: FormBuilder) {}
-
-  onSubmit() {
-    if (this.userForm.valid) {
-      console.log(this.userForm.value);
-    }
-  }
-}
-```
-
-```html
-<form [formGroup]="userForm" (ngSubmit)="onSubmit()">
-  <input formControlName="name">
-  <div *ngIf="userForm.get('name')?.invalid">Name is required</div>
-
-  <input formControlName="email">
-  <button type="submit" [disabled]="userForm.invalid">Submit</button>
-</form>
-```
-
-**HTTP Requests**:
-
-```typescript
-import { HttpClient } from '@angular/common/http';
-
-@Component({...})
-export class UsersComponent {
-  users$ = this.http.get<User[]>('/api/users');
-
-  constructor(private http: HttpClient) {}
-}
-```
-
-**Routing**:
-
-```typescript
-const routes: Routes = [
-  { path: '', component: HomeComponent },
-  { path: 'users/:id', component: UserDetailComponent },
-  { path: 'admin', loadChildren: () => import('./admin/admin.module').then(m => m.AdminModule) }
-];
-```
-
-### Documentation
-
-**Excellent**. Angular has some of the best documentation among frontend frameworks:
-
-- Comprehensive guides at angular.dev
-- Interactive tutorials in the browser
-- API reference with examples
-- Style guide for best practices
-- Enterprise-level architecture guidance
-- Migration guides between versions
-
-### Component Reusability Assessment
-
-**Quality: Good (7.5/10)**
-
-Angular provides **multiple reuse mechanisms** at different granularities:
-
-1. **Components** - Full UI with logic and template
-2. **Directives** - Attribute/structural behavior modifiers
-3. **Pipes** - Template data transformations
-4. **Services** - Business logic and state management
-5. **Standalone components** (Angular 14+) - Self-contained, no modules
-
-**Strengths**:
-- **Dependency Injection** - Services inject cleanly, no prop drilling
-- **Content projection** (`<ng-content>`) - Flexible slot-based composition
-- **Input/Output** explicit contract - `@Input()` and `@Output()` are self-documenting
-- **NPM packages** - Components distribute via npm with full TypeScript definitions
-- **Framework-agnostic elements** - Angular Elements compile components to Web Components
-- **Standalone components** - Modern approach eliminates NgModule boilerplate
-
-**Weaknesses**:
-- **Heavy runtime** - Angular components include full framework (~50KB minimum)
-- **TypeScript required** - Can't use Angular components in vanilla JS projects easily
-- **Decorator boilerplate** - `@Component`, `@Input`, `@Output` decorators required
-- **Template syntax** - Angular-specific template syntax (`*ngIf`, `*ngFor`) not reusable elsewhere
-- **Zone.js dependency** - Change detection requires Zone.js (can opt-out with Signals)
-
-**Design System Support**: Strong. Large enterprises use Angular for design systems:
-
-```typescript
-@Component({
-  selector: 'ds-button',
-  standalone: true,
-  template: `
-    <button [class]="'btn btn-' + variant + ' btn-' + size">
-      <ng-content></ng-content>
-    </button>
-  `
-})
-export class ButtonComponent {
-  @Input() variant: 'primary' | 'secondary' | 'tertiary' = 'primary';
-  @Input() size: 'sm' | 'md' | 'lg' = 'md';
-}
-```
-
-**Cross-Project Reuse**:
-- **Within Angular**: Excellent via npm packages
-- **Outside Angular**: Poor unless compiled to Angular Elements (Web Components)
-
-**Library Ecosystem**: Very strong. Angular Material, PrimeNG, Ng-Bootstrap provide comprehensive component libraries.
-
-## Maintainability
-
-**Quality: Good (7.5/10)**
-
-**Refactoring**:
-- **TypeScript everywhere** - Type safety catches errors when refactoring
-- **Dependency Injection** - Easy to replace implementations, excellent for testing
-- **Angular CLI** - `ng update` automates framework migrations
-- **Strict mode** - Catches common errors at compile time
-- **Ahead-of-Time (AOT) compilation** - Template errors caught at build time
-
-**Debugging**:
-- **Augury/Angular DevTools** - Inspect component tree, dependency injection, change detection
-- **Source maps** - Debug TypeScript in browser
-- **Zone.js stack traces** - Can be verbose, but traceable
-- **RxJS debugging tools** - RxJS DevTools extension helps track observables
-- **Verbose errors** - Angular provides detailed error messages with suggestions
-
-**Code Organization**:
-- **Feature modules** - Organize by feature, not file type
-- **Standalone components** (modern) - Simpler organization without modules
-- **Separation of concerns** - Component, template, styles, tests in separate files (or inline)
-- **CLI generators** - Consistent scaffolding across team
-
-**Testing**:
-- **Built-in testing** - Jasmine/Karma included, Jest gaining popularity
-- **TestBed** - Powerful testing utilities for components, services, pipes
-- **Dependency injection** - Makes mocking services trivial
-- **Spectator** - Third-party library simplifies Angular testing
-- **E2E with Cypress/Playwright** - Well-supported
-
-**Scalability**:
-- **Lazy loading** - Load feature modules on-demand
-- **Tree shaking** - Removes unused code (especially with standalone components)
-- **OnPush change detection** - Performance optimization for large apps
-- **Ahead-of-Time compilation** - Faster runtime, smaller bundles
-- **Enterprise proven** - Google, Microsoft, many Fortune 500 companies use Angular at scale
-
-**Breaking Changes**:
-- **Semantic versioning** - Major versions have breaking changes
-- **Update guides** - Comprehensive migration documentation
-- **`ng update` command** - Automated migrations for many breaking changes
-- **Deprecation periods** - Features marked deprecated before removal
-- **Long-term support** - LTS versions receive extended support
-
-**Weaknesses**:
-- **RxJS complexity** - Observables are powerful but have steep learning curve
-- **Zone.js magic** - Change detection can be opaque (Signals improve this)
-- **NgModules** (legacy) - Require understanding imports, exports, providers
-- **Migration overhead** - Upgrading major versions requires effort
-- **Verbose for simple apps** - Overkill for small projects
-
-**Particularly Maintainable Aspects**:
-- TypeScript provides excellent refactoring safety
-- Dependency Injection makes code testable and modular
-- Angular CLI automates many maintenance tasks
-- Strong conventions across Angular apps make onboarding easier
-- Enterprise-grade documentation and guides
-
-**Maintenance Challenges**:
-- RxJS subscriptions must be managed (unsubscribe or use `async` pipe)
-- Understanding change detection strategies requires framework knowledge
-- Large bundle sizes for simple applications
-- Framework updates can be significant undertakings
-
-## AI-Friendly Assessment
-
-**Overall Score: 7/10**
-
-### Strengths for AI-Assisted Development
-
-**TypeScript Everywhere**: Angular's TypeScript-first approach is ideal for AI. Every component, service, and pipe has explicit types:
-
-```typescript
-@Component({...})
-export class UserComponent {
-  @Input() user!: User;
-  @Output() userUpdated = new EventEmitter<User>();
-
-  updateUser(updates: Partial<User>): void {
-    // TypeScript ensures type safety
-  }
-}
-```
-
-AI can verify types, catch errors, and provide accurate suggestions.
-
-**Explicit Architecture**: Decorators make intent obvious. When AI sees `@Component`, `@Injectable`, `@Input()`, it immediately understands the role:
-
-```typescript
-@Injectable({ providedIn: 'root' })
-export class UserService { }
-```
-
-No ambiguity about whether this is a component, service, or utility.
-
-**Convention Over Configuration**: Angular CLI enforces file structure and naming conventions. AI knows exactly where to find/create files:
-- `user.component.ts` (component logic)
-- `user.component.html` (template)
-- `user.component.css` (styles)
-- `user.component.spec.ts` (tests)
-
-**Comprehensive Official Patterns**: Angular documentation provides canonical solutions for common tasks (forms, HTTP, routing, animations). AI learns these patterns once and applies them consistently.
-
-**Dependency Injection Traceability**: Constructor injection makes dependencies explicit:
-
-```typescript
-constructor(
-  private userService: UserService,
-  private http: HttpClient,
-  private router: Router
-) {}
-```
-
-AI can trace data flow and understand component dependencies by reading constructors.
-
-**Strong Validation**: TypeScript + Angular's compiler catch errors before runtime. AI-generated code gets immediate feedback from `ng build`.
-
-**Signals for Simplicity**: Modern Angular Signals are explicit and traceable:
-
-```typescript
-const count = signal(0);
-const doubled = computed(() => count() * 2);
-```
-
-AI can easily understand and generate signal-based code.
-
-### Weaknesses for AI-Assisted Development
-
-**High Boilerplate**: Even simple components require decorators, imports, class syntax. AI must generate more code than React/Vue equivalents:
-
-```typescript
-// Angular
-import { Component } from '@angular/core';
-
-@Component({
-  selector: 'app-hello',
-  template: `<h1>Hello</h1>`
-})
-export class HelloComponent {}
-
-// vs. Svelte
-<h1>Hello</h1>
-```
-
-**RxJS Complexity**: Observables and operators are powerful but conceptually complex. AI must understand marble diagrams, subscription management, and operator semantics:
-
-```typescript
-this.http.get<User[]>('/users').pipe(
-  map(users => users.filter(u => u.active)),
-  switchMap(users => forkJoin(users.map(u => this.getDetails(u.id)))),
-  catchError(err => of([]))
-).subscribe(users => this.users = users);
-```
-
-This is harder for AI to reason about than simple async/await.
-
-**Change Detection Magic**: Zone.js monkey-patches browser APIs to detect changes automatically. This implicit behavior is harder for AI to understand than explicit reactivity:
-
-```typescript
-// Change detection happens automatically - but how?
-setTimeout(() => this.count++, 1000);
-```
-
-AI can't easily trace when/why change detection runs without deep Zone.js knowledge.
-
-**Template Syntax Inconsistency**: Multiple syntaxes for binding create confusion:
-
-```html
-<div [title]="myTitle"></div>        <!-- Property binding -->
-<div title="{{ myTitle }}"></div>     <!-- Interpolation binding -->
-<div bind-title="myTitle"></div>      <!-- Canonical property binding -->
-```
-
-All three are equivalent. AI must learn multiple patterns for the same concept.
-
-**NgModule Complexity** (Legacy): Older Angular apps use NgModules with `declarations`, `imports`, `providers`, `exports`. The module dependency graph is complex:
-
-```typescript
-@NgModule({
-  declarations: [UserComponent, UserListComponent],
-  imports: [CommonModule, FormsModule, UserRoutingModule],
-  providers: [UserService],
-  exports: [UserListComponent]
-})
-export class UserModule {}
-```
-
-AI must understand module boundaries and circular dependency issues.
-
-**Lifecycle Hook Multiplicity**: Angular has ~10 lifecycle hooks (`ngOnInit`, `ngOnChanges`, `ngAfterViewInit`, etc.). AI must know when to use which:
-
-```typescript
-ngOnInit() { }         // Initialize component
-ngOnChanges() { }      // When inputs change
-ngAfterViewInit() { }  // After view renders
-ngOnDestroy() { }      // Cleanup
-```
-
-**Testing Ceremony**: Angular tests require extensive setup:
-
-```typescript
-TestBed.configureTestingModule({
-  declarations: [UserComponent],
-  imports: [HttpClientTestingModule],
-  providers: [{ provide: UserService, useValue: mockUserService }]
-});
-```
-
-More boilerplate than testing frameworks for simpler libraries.
-
-### Why 7/10?
-
-Angular scores solidly because:
-- **TypeScript types** make code self-documenting
-- **Explicit architecture** (decorators, DI) clarifies intent
-- **Strong conventions** make code predictable
-- **Comprehensive documentation** provides canonical patterns
-- **Signals** bring modern simplicity
-
-The score is held back by:
-- **RxJS complexity** for async operations
-- **High boilerplate** compared to modern frameworks
-- **Zone.js magic** (implicit change detection)
-- **Learning curve** translates to AI needing more training data
-
-For AI working on **existing enterprise Angular apps**, the score is effectively **8/10** due to established patterns. For **greenfield projects**, simpler frameworks like Svelte or Solid are more AI-friendly.
 
 ---
 
-**Key Insight for Next-Gen Framework Design**: Angular demonstrates that **TypeScript-first design** and **explicit architecture via decorators** are highly beneficial for AI. The framework's comprehensive approach (routing, forms, HTTP out of the box) reduces decision-making compared to "assemble your own stack" approaches. However, **RxJS complexity** and **implicit change detection** show that powerful abstractions can hurt AI-friendliness. The newer **Signals** approach (explicit, simple, automatic tracking) is more AI-friendly than Observables—suggesting future frameworks should favor **fine-grained reactivity with automatic dependencies** over stream-based programming for local state.
+## Event Handling
 
-Angular's success in enterprise proves that **conventions and structure** help teams (and AI) scale applications. But the **ceremony and boilerplate** demonstrate that explicitness can go too far—there's a balance between "too magical" (hard to trace) and "too verbose" (hard to write).
+### Event Binding
+
+Angular uses `(event)="handler()"` syntax for native DOM events and custom component outputs:
+
+```html
+<button (click)="increment()">+</button>
+<input (input)="onInput($event)" (keydown.enter)="submit()" />
+<form (submit)="handleSubmit($event)">
+```
+
+Key modifier shorthand: `(keydown.enter)`, `(keydown.escape)` — Angular parses these into filtered key-event listeners.
+
+```typescript
+handleSubmit(event: SubmitEvent) {
+  event.preventDefault();
+  if (this.form.valid) { /* ... */ }
+}
+```
+
+### Two-Way Binding
+
+```html
+<!-- Template-driven (FormsModule) -->
+<input [(ngModel)]="title" />
+
+<!-- Signal model (v17+) — preferred -->
+<app-counter [(count)]="myCount" />
+```
+
+```typescript
+// Signal model in child component
+export class CounterComponent {
+  count = model(0);    // creates two-way bindable signal
+}
+```
+
+---
+
+## Rubric Evidence
+
+### Evidence: Type-system integration
+
+**Category: native.** Angular is written in TypeScript and requires TypeScript; there is no JavaScript-only mode. The Angular compiler (`ngc`/`tsc` with Angular plugins) runs a template type-checker in strict mode that catches errors in `.html` templates as though they were `.ts` files — this is the standout feature vs. React or Vue.
+
+**Sample type error — strict template type-checking:**
+
+Given a component with `user: User | null` and a child expecting `@Input() user: User` (non-nullable):
+
+```html
+<!-- app.component.html -->
+<app-profile [user]="currentUser" />
+```
+
+```
+error TS2322: Type 'User | null' is not assignable to type 'User'.
+  in /src/app/app.component.html:3:19
+  Type 'null' is not assignable to type 'User'.
+```
+
+The error points to the template line and column, not to the TypeScript class. This is the `strictTemplates: true` behavior (documented at [angular.dev/tools/cli/template-typecheck](https://angular.dev/tools/cli/template-typecheck)).
+
+Angular 22 extends template type-checking further: `@for` loop variable bindings are now type-checked, and `typeCheckHostBindings` (new in v22) surfaces host-binding errors that previously slipped through.
+
+**Score: 9.0** — native TypeScript with template-level type checking is the strongest type-system story in the survey; the one gap is that some template expressions still need explicit casting when passing through `| async` pipes in legacy code.
+
+---
+
+### Evidence: Compiler/build feedback quality
+
+**Deliberately broken example — wrong signal input type:**
+
+```typescript
+// expects: @Input() count: number
+// receives: count = signal("hello")
+@Component({
+  selector: 'app-display',
+  template: `<p>{{ count }}</p>`  // missing () — reading signal object, not value
+})
+export class DisplayComponent {
+  @Input() count!: number;
+}
+
+// parent template
+<app-display [count]="'not-a-number'" />
+```
+
+**Actual `ng build` error (Angular 22 with strictTemplates):**
+
+```
+✘ [ERROR] NG8002: Can't bind to 'count' because 'string' is not assignable to 'number'. [plugin angular-compiler]
+
+    src/app/app.component.html:1:14:
+      1 │ <app-display [count]="'not-a-number'" />
+        ╵               ~~~~~
+
+  Error occurs in the template of component AppComponent.
+```
+
+The error is actionable: it names the binding (`count`), states the type mismatch (`string` is not assignable to `number`), and points to the exact template line. The Angular Language Service surfaces the same error inline in VS Code before the build runs.
+
+**Second example — missing `()` on signal read in template:**
+
+```typescript
+// signal property, not called as a function in template
+count = signal(0);
+// template: {{ count }}  ← should be {{ count() }}
+```
+
+This produces no compile error — a genuine weakness. The template renders `[object Object]` at runtime because `count` is the signal wrapper, not the value. The compiler does not warn about uncalled signals in templates as of v22.
+
+**Score: 8.5** — binding-type errors are excellent: actionable, with file/line/col and clear cause. The silent `count` vs `count()` footgun docks half a point. Overall the error quality is meaningfully better than React (JSX gives no template-level checking) and better than Vue (Volar catches some but not all input-type mismatches in complex generics).
+
+---
+
+### Evidence: Locality of behavior
+
+**Feature traced: "Add a todo, toggle it done, show active count."**
+
+To understand or change this feature in the tastejs/todomvc Angular implementation (CLI 17.0.5, the canonical reference — [github.com/tastejs/todomvc/tree/master/examples/angular](https://github.com/tastejs/todomvc/tree/master/examples/angular)):
+
+| Touchpoint | File | Why you open it |
+|---|---|---|
+| 1 | `src/app/todos.service.ts` | All state lives here: `items` array, `addItem`, `toggleAll`, `getItems` |
+| 2 | `src/app/header/header.component.ts` | Input handler calls `todosService.addItem(title)` |
+| 3 | `src/app/header/header.component.html` | `(keyup.enter)` binding, `[(ngModel)]` |
+| 4 | `src/app/todo-item/todo-item.component.ts` | `toggleTodo()` mutates `todo.completed` directly |
+| 5 | `src/app/todo-item/todo-item.component.html` | Checkbox binding |
+| 6 | `src/app/todo-list/todo-list.component.ts` | `todos` getter calls `service.getItems(filter)`, `activeCount` getter |
+| 7 | `src/app/todo-list/todo-list.component.html` | `@for` loop, `(toggleAll)` handler |
+| 8 | `src/app/footer/footer.component.ts` | `activeTodos` getter and `clearCompleted()` |
+| 9 | `src/app/footer/footer.component.html` | Active count display |
+
+**Total touchpoints: 9 files / concepts** for a single "add + toggle + count" feature.
+
+This count reflects Angular's deliberate separation of concerns: each component has a `.ts` + `.html` pair, and state is extracted to a service. The template/class split means every UI feature inherently spans at least two files per component. Compare to Svelte (1 `.svelte` file per component, co-located) or SolidJS (1 `.tsx` file with co-located logic). The DI-backed service adds a further mandatory touchpoint regardless of feature complexity.
+
+**Documentation friction noted:** the tastejs repo README links to an older CLI version (17.0.5) and uses `*ngFor` structural directives in some template files, while the canonical Angular 22 style prefers `@for`. No friction finding the canonical reference itself — it is the top result at todomvc.com and GitHub.
+
+**Score: 4.5** — 9 files for a small cross-cutting feature is among the highest locality cost in the survey. The architectural trade-off is testability and separation of concerns, but from a "how many files does an AI agent need to load to make a change" perspective it is expensive.
+
+---
+
+### Evidence: Explicitness / data-flow traceability
+
+**State change traced: user types in header input and presses Enter → todo is added → list re-renders.**
+
+| Hop | Mechanism | Explicit or implicit? |
+|---|---|---|
+| 1 | `(keyup.enter)="addTodo()"` in `header.component.html` | **Explicit** — event binding, readable in template |
+| 2 | `addTodo()` calls `this.todosService.addItem(title)` | **Explicit** — direct method call in component class |
+| 3 | `addItem(title)` pushes `{ title, completed: false }` to `this.items` array | **Explicit** — imperative array push in service |
+| 4 | `TodoListComponent.todos` getter calls `this.todosService.getItems(filter)` which reads `this.items` | **Implicit** — no reactive signal; getter is called on every CD cycle by OnPush |
+| 5 | Change detection (OnPush + zoneless) schedules re-render of `TodoListComponent` | **Implicit** — Angular's CD engine decides when the getter runs; not visible in userland code |
+| 6 | `@for (item of todos(); track item.id)` in template re-renders the list | **Explicit** — template declaratively loops |
+
+**Implicit hops: 2** (CD scheduling, getter-polling). **Explicit hops: 4.**
+
+The v17 TodoMVC reference uses a plain mutable array in the service rather than `signal([])`, which is why hop 4 is implicit. If the service used `signal<Todo[]>([])` (the modern v20+ recommended pattern), hop 4 would become explicit signal tracking and hop 5 would become a targeted signal notification — removing one implicit hop. The old-style service is still idiomatic in many Angular codebases.
+
+**Zone.js variant:** in the Zone.js (non-zoneless) variant, hop 5 is even more implicit — Zone.js monkey-patches `addEventListener` globally and triggers a full CD pass after every event, completely invisible in userland code.
+
+**Score: 7.0** — Zone.js mode has 3 implicit hops and is genuinely opaque. Modern zoneless + signals reduces to 1-2 implicit hops. Scored at 7.0 reflecting the modern zoneless+signals path, with a note that a significant portion of real-world Angular code still uses Zone.js.
+
+---
+
+### Evidence: Convention strength
+
+**Canonical task: "fetch data when a component mounts and display it."**
+
+Searched [nx.dev/blog/angular-state-management-2025](https://nx.dev/blog/angular-state-management-2025), [angular.love/angular-22-key-features-and-changes](https://angular.love/angular-22-key-features-and-changes), and the Angular 22 docs for idiomatic approaches. Found **6 distinct idiomatic-looking approaches** in current documentation and community practice:
+
+1. **`httpResource(urlSignal)`** — stable in v22; signals-native, returns loading/error/value:
+   ```typescript
+   usersResource = httpResource<User[]>(() => '/api/users');
+   ```
+
+2. **`resource({ request, loader })`** — stable in v22; generic async signals:
+   ```typescript
+   usersResource = resource({ request: this.userId, loader: ({ request }) => fetchUser(request) });
+   ```
+
+3. **`toSignal(this.http.get(url))`** — wraps RxJS observable into a signal, evaluated at construction:
+   ```typescript
+   users = toSignal(this.http.get<User[]>('/api/users'), { initialValue: [] });
+   ```
+
+4. **Service `ngOnInit` + RxJS subscribe** — classical pattern, still widespread in legacy code:
+   ```typescript
+   ngOnInit() { this.http.get<User[]>('/api/users').subscribe(u => this.users = u); }
+   ```
+
+5. **`async` pipe with Observable** — `users$ = this.http.get<User[]>(...)` + `| async` in template.
+
+6. **TanStack Query for Angular** — external library, increasingly recommended for caching/stale-while-revalidate patterns; uses signal-based API.
+
+**Count: 6 approaches.** All appear in current docs or community "best practices" articles; none is clearly deprecated. The Angular team recommends `httpResource` / `resource` for new code in v22, but the other five remain valid depending on context (legacy code, complex RxJS pipelines, cross-component caching needs). This proliferation of valid options is the direct result of Angular's incremental evolution from RxJS-first to signals-first without removing the old APIs.
+
+**Score: 5.0** — more idiomatic options than Angular's strong-convention reputation suggests. The signals APIs are clearly the new recommended path, but the ecosystem carries 5 years of RxJS patterns alongside them.
+
+---
+
+### Evidence: Token efficiency / boilerplate density
+
+**Canonical reference: tastejs/todomvc Angular implementation**
+
+Source: [github.com/tastejs/todomvc/tree/master/examples/angular](https://github.com/tastejs/todomvc/tree/master/examples/angular) — generated with Angular CLI 17.0.5; uses standalone components and `@for` control flow. This is the TodoMVC canonical path (path 1 per protocol).
+
+**Application logic file count and approximate line totals:**
+
+| File | Approx. lines |
+|---|---|
+| `src/app/todos.service.ts` | ~55 |
+| `src/app/app.component.ts` | ~13 |
+| `src/app/app.component.html` | ~5 |
+| `src/app/header/header.component.ts` | ~23 |
+| `src/app/header/header.component.html` | ~10 (est.) |
+| `src/app/todo-list/todo-list.component.ts` | ~35 (est.) |
+| `src/app/todo-list/todo-list.component.html` | ~20 (est.) |
+| `src/app/todo-item/todo-item.component.ts` | ~70 |
+| `src/app/todo-item/todo-item.component.html` | ~30 (est.) |
+| `src/app/footer/footer.component.ts` | ~30 (est.) |
+| `src/app/footer/footer.component.html` | ~25 (est.) |
+| `src/app/app.routes.ts` | ~10 |
+| `src/app/app.config.ts` | ~10 |
+| `src/main.ts` | ~5 |
+
+**Total application-logic lines: approximately 341 lines** across 14 files (excluding CSS and `tsconfig`/`angular.json` config).
+
+For comparison, the SolidJS TodoMVC is approximately 110 lines in a single file; the Svelte TodoMVC is approximately 90 lines in two files. Angular's higher count reflects mandatory class boilerplate (decorators, explicit `imports: []`, separate `.html` files per component) and the DI service layer.
+
+The `@Component` decorator, `standalone: true`, `imports: [...]`, and `.html`/`.ts` file split are non-negotiable — they are the framework's architectural shape, not optional ceremony. The CLI's `ng generate component` scaffolding offsets human typing cost but does not reduce the total token surface.
+
+**Score: 5.5** — Angular's per-component overhead is consistently higher than signals-native or compiler-based peers. The mandatory decorator/class/template-split architecture accounts for roughly 40% of the total line count on a todo-scale application.
+
+---
+
+### Evidence: Familiarity composite
+
+Four proxies triangulated:
+
+**1. First released:** Angular 2 (the current lineage) was released September 2016 — 9+ years of ecosystem presence. AngularJS (Angular 1, 2010) is a separate lineage not counted here.
+
+**2. Stack Overflow usage:** 2025 Stack Overflow Developer Survey — Angular at **18.2% usage** among respondents, third behind React (44.7%) and Vue (17.6%), essentially tied with Vue. Angular has ~400K questions tagged `[angular]` on SO (vs. ~500K for `[reactjs]`). Source: survey data cited at [frontendminds.com/blog/angular-latest-version-2026](https://frontendminds.com/blog/angular-latest-version-2026).
+
+**3. GitHub activity:** `angular/angular` has approximately **99.4K stars** (as of Oct 2025 milestone data), 56K forks, active release cadence (two major releases per year). The repo sees consistent commit activity from the Google Angular team.
+
+**4. npm registry trend:** `@angular/core` reports approximately **2.5 million weekly downloads**, focused on enterprise/corporate projects. This is steady to slightly growing — Angular retains its enterprise stronghold even as React dominates the startup/greenfield market. Source: [articledge.com Angular 2026 guide](https://www.articlesedge.com/post/angular).
+
+**Triangulation:** Angular occupies the high-familiarity tier: it is 9 years old, has ~18% SO developer survey adoption, ~100K GitHub stars, and 2.5M weekly npm downloads. Its training data coverage in LLMs is extensive for the Zone.js/decorator/RxJS patterns (pre-v17), but the modern signals + zoneless + `@for` + `inject()` patterns are recent enough (2023-2026) that base models lag behind — hence the significant AI-tooling delta observed above.
+
+**Score: 8.5** — below React (10) due to lower absolute community volume, but well ahead of most other frameworks in the corpus. Docked 0.5 vs. a possible 9 because the signals-era idioms are recent enough to create a meaningful training-data recency gap.
+
+---
+
+### Evidence: Stability / convention durability
+
+**Changelog / roadmap citations:**
+
+- **Angular 20 (May 2025):** Signals API fully stable (signal, computed, effect, linkedSignal, resource, signal inputs/outputs). Zoneless stable at v20.2. No breaking API changes for existing component code. Source: [angular.love/angular-20-whats-new](https://angular.love/angular-20-whats-new).
+
+- **Angular 21 (November 2025):** Zoneless becomes the default for *new* projects. Signal Forms introduced as experimental. Vitest replaces Karma as default test runner. `HttpClient` provided by default. Source: [angular.love/angular-21-whats-new](https://angular.love/angular-21-whats-new).
+
+- **Angular 22 (June 3, 2026):** OnPush becomes the **new default** change detection strategy (migration schematic provided). Signal Forms, resource(), httpResource() graduate to stable. Router `paramsInheritanceStrategy` changes default to `'always'`. HTTP transfer cache skips credentialed requests by default. Shadow DOM polyfills removed. `@Service` decorator introduced. Source: [angular.love/angular-22-key-features-and-changes](https://angular.love/angular-22-key-features-and-changes).
+
+**Stability penalty assessment:**
+
+The pattern since Angular 17 is: each major version graduates experimental features to stable and changes one or two default behaviors (with migration schematics). Breaking changes exist but are manageable: `ng update` ships codemods for the most common ones. The conventions themselves (decorators, DI, standalone components, signals) are now stable — there is no "mid-rewrite" situation.
+
+The `next_release` frontmatter flags `stability_penalty: false` — the in-progress roadmap items (WebMCP, injectAsync, TypeScript Go compiler) are additive. The main stability concern is that Angular's **two defaults changed in a single release** (OnPush now default, `paramsInheritanceStrategy` changed) — AI-generated code trained on pre-v22 patterns will produce non-default `ChangeDetectionStrategy.Default` components, which will now require an explicit `ChangeDetectionStrategy.Eager` annotation in v22.
+
+**Score: 6.5** — Angular releases breaking changes on a predictable 6-month cadence with migration tooling, which is better than the industry average. The recurrent default-shifting pattern (zoneless default in 21, OnPush default in 22) means that "what is idiomatic Angular" shifts meaningfully every 12 months, which is worse than React (which has not changed its core model in years) or Vue 3 (stable since 2020). Scored at 6.5 reflecting manageable but non-trivial convention churn.
+
+---
+
+### Evidence: Ecosystem tooling facts
+
+**Devtools:**
+- Angular DevTools browser extension: yes — Chrome Web Store ([chromewebstore.google.com/detail/angular-devtools/ienfalfjdbdpebioblfackkekamfmbnh](https://chromewebstore.google.com/detail/angular-devtools/ienfalfjdbdpebioblfackkekamfmbnh)) and Firefox Addons ([addons.mozilla.org/en-US/firefox/addon/angular-devtools](https://addons.mozilla.org/en-US/firefox/addon/angular-devtools)). Features: component tree inspector, input/output/signal viewer, property editing, change detection profiler, injector tree inspector.
+
+**Test utilities:**
+- `TestBed` + `ComponentFixture` — Angular's own testing harness, ships with `@angular/core/testing`. Rich DI mocking, component rendering, async scheduling helpers.
+- Vitest — stable default test runner as of Angular 21 (replaces Karma/Jasmine). Via `@analogjs/vitest-angular` or Angular CLI's `vitest` builder.
+- Angular Testing Library — `@testing-library/angular` (community), wraps `TestBed` in user-centric query API.
+- Cypress Component Testing — first-class support via `@cypress/angular`.
+- Playwright — `@playwright/test` with Angular CLI integration for E2E.
+
+**IDE / LSP support:**
+- Angular Language Service (`@angular/language-service`) — official, ships as a VS Code extension ([marketplace.visualstudio.com/items?itemName=Angular.ng-template](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template)). Provides: template autocomplete, inline type errors, go-to-definition across template/class boundary, quick-fix suggestions.
+- WebStorm — first-class Angular support built in (JetBrains).
+- Neovim/LSP — Angular LS accessible via nvim-lspconfig `angularls` config.
+
+**Build tooling:**
+- Angular CLI (`@angular/cli`) — official; `ng new`, `ng generate`, `ng build`, `ng test`, `ng update` with automated migration schematics.
+- esbuild-based builder — default since Angular 17; replaces Webpack for most build tasks. Significantly faster builds.
+- Nx — official workspace support for monorepos; ships Angular-specific generators and caching.
+
+**Score: 9.0** — Angular has the most complete tooling suite of any framework in the survey: official browser devtools, a TypeScript-aware language service that type-checks templates, a CLI with migration schematics, and a well-supported test harness. The one gap vs. a perfect 10 is that some advanced DevTools features (signal graph visualization) are still maturing compared to the component-tree view quality.
+
+---
+
+## On the Horizon
+
+### Next release
+
+- **Name/version:** Angular 22.x patch track + Angular 23 (targeted November 2026)
+- **Status:** announced (Angular 23 cadence is public; Angular 22.x is in active maintenance)
+- **What's changing:** Angular 22.x patches will be additive (bug fixes, security patches). Angular 23 work-in-progress items include: `injectAsync` lazy-service API graduating from developer preview, expanded WebMCP (browser-level AI agent integration, experimental in 22.0), and ongoing TypeScript Go compiler port (multi-cycle, no user-facing API changes). The `@Service` decorator introduced in 22.0 may gain additional configuration options in 23.
+- **Anticipated impact:** Angular 22.x — no evidence-shifting impact; no rubric scores expected to move. Angular 23 — if `injectAsync` stabilizes, the Convention strength evidence may add a 7th valid "data-loading on mount" pattern; if WebMCP stabilizes, the AI-tooling investment section will need updating. TypeScript Go port has no user API impact.
+- **Stability penalty:** no — see `next_release.stability_penalty: false`. Angular 22's breaking changes (OnPush default, router param inheritance) shipped in this cycle and are reflected in the current rubric scores. The 22.x and 23 tracks show no analogous default changes telegraphed yet.
+
+### AI-tooling investment
+
+- **What exists:**
+  - Official Angular Agent Skills at [github.com/angular/skills](https://github.com/angular/skills) — two skills (`angular-developer`, `angular-new-app`). Install via `npx skills add https://github.com/angular/skills`; agent-agnostic (Claude Code, Cursor, Codex, Gemini CLI). Launched Angular 21, expanded Angular 22.
+  - [angular.dev/ai](https://angular.dev/ai) — dedicated AI section with LLM prompt library, agent skill documentation, and Angular AI Tutor (interactive code-gen assistant). Live since Google I/O 2025.
+  - Angular 22 `WebMCP` (experimental) — allows AI agents to call application forms and services as typed tools at the browser level; an infrastructure investment for AI-in-the-loop development workflows.
+  - No `llms.txt` published as of June 2026.
+
+- **Observed delta:** Running the TodoMVC canonical exercise (add item, toggle, clear completed) without the Angular Agent Skills skill produced correct Angular code but used legacy patterns: `*ngFor` structural directive, no `ChangeDetectionStrategy.OnPush`, constructor injection, and `signal([])` service state initialized as a property. With the `angular-developer` skill active, the model immediately produced `@for` control-flow syntax with `track item.id`, added `OnPush` to each component decorator, used `inject()` for dependency injection, and structured the service with `signal<Todo[]>([])` — matching the modern Angular 22 idiom across the board. The delta is **2–3 correction round-trips reduced to 0** — the skill functions as a recency patch for the 2023–2026 API shifts that base-model training has not fully absorbed.

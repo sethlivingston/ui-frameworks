@@ -5,11 +5,35 @@ github_url: "https://github.com/TanStack/query"
 docs_url: "https://tanstack.com/query/latest"
 implementation_language: "TypeScript"
 status: "active"
-ai_friendliness_score: null
-reusability_score: 9
-maintainability_score: 8.5
-version: "5.90.12"
+type_system_score: 8.5
+compiler_feedback_score: 7.5
+locality_score: 8.5
+explicitness_score: 7.5
+convention_strength_score: 6.5
+token_efficiency_score: 7.5
+familiarity_score: 8.5
+stability_score: 8
+tooling_score: 8.5
+version: "5.101.0"
 npm_package: "@tanstack/react-query"
+ai_tooling:
+  mcp_server:
+    available: false
+    url: null
+    party: null
+  guidelines: null
+  llms_txt: true
+  style_guides: null
+  observed_delta: "TanStack publishes a project-wide llms.txt at tanstack.com/llms.txt (an index of all TanStack libraries with links, not Query-specific content or full doc text). Running the canonical fetch+mutate+invalidate exercise with this llms.txt in context vs. without: no measurable difference. The index format gives an AI a map of which docs pages exist but doesn't inline the actual useQuery/useMutation/invalidateQueries patterns, so it functions more as a navigation aid for an agent that can follow links than as in-context pattern guidance. No official MCP server, no Boost-style curated guidelines package, and no TanStack-Query-specific AI style guide were found."
+next_release:
+  name: null
+  status: null
+  changes: "v5 (current major, first released 2023) is in an active patch series — 5.101.0 shipped 2026-06-02, with weekly-to-biweekly patch releases throughout 2026 (5.100.9 through 5.101.0 across May-June 2026). No v6 for the React/core package is announced; a 'TanStack Query v6' name only exists for the Svelte adapter (Svelte 5 support), which still runs on the v5 core. No RFC, milestone, or roadmap discussion proposes a v6 for @tanstack/react-query."
+  anticipated_impact: "None anticipated for the core useQuery/useMutation/QueryClient API. Patch releases are bug fixes, TypeScript inference refinements, and dependency bumps."
+  stability_penalty: false
+components: null
+supersedes: null
+superseded_by: null
 typescript_support: "native"
 license: "MIT"
 runtime: "browser"
@@ -21,8 +45,9 @@ paradigm: "declarative"
 state_model: "queries"
 maintainer: "TanStack"
 first_released: "2019"
-reviewed_date: "2025-12-06"
-reviewed_by_model: "Claude Sonnet 4.5"
+reviewed_date: "2026-06-09"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Full rewrite under the 9-dimension agentic-dev rubric. Previous file had null scores and the pre-rubric per-capability-area structure; entire body replaced. Version verified via `npm view @tanstack/react-query version` -> 5.101.0 (released 2026-06-02). Reviewed as used in its primary context: React + TypeScript (@tanstack/react-query), the framework adapter with by far the largest install base; Vue/Svelte/Solid/Angular adapters share the same query-core but were not separately re-verified. TanStack Query is a server-state/caching library, not a client-state library like Redux/Zustand/Jotai/MobX/XState already in this corpus -- it does not own rendering or event handling, and 'a representative feature' for locality/explicitness was chosen as a fetch + mutate + cache-invalidate cycle rather than a counter or todo-toggle, per the framework-researcher brief. TanStack Start (a separate, broader meta-framework using TanStack Router) is reviewed independently in tanstack-start.md and is not in scope here."
 ---
 
 # TanStack Query
@@ -31,758 +56,361 @@ reviewed_by_model: "Claude Sonnet 4.5"
 
 ### Philosophy & Mental Model
 
-TanStack Query represents a **paradigm shift** from traditional state management to **declarative async state management**. The core philosophy:
+TanStack Query (formerly React Query) is built on a single, explicitly-named distinction: **server state is not client state**. Data that lives on a server is asynchronous, shared, potentially stale the moment it arrives, and not owned exclusively by the client holding it. The library's stated job is to make that kind of data feel synchronous and current without the developer hand-rolling caching, deduplication, retries, or staleness tracking.
 
-**"Server state is fundamentally different from client state"**
-
-Key mental model concepts:
-- **Server state vs client state**: Data from servers has unique characteristics - it's remote, potentially stale, asynchronously updated, and potentially owned by others
-- **Declarative data fetching**: "Tell TanStack Query where to get your data and how fresh you need it to be and the rest is automatic"
-- **Stale-while-revalidate**: Show cached data immediately, fetch fresh data in background
-- **Zero manual cache management**: No need to code caching logic, timers, retry mechanisms, or race condition handling
-- **Simplicity**: If you understand promises/async-await, you can use TanStack Query
-
-**Core insight**: Most "state management" problems in React apps are actually **async server state synchronization** problems, not local state problems. TanStack Query specializes in this.
-
-**Mental model shift**:
-- Traditional: Fetch data → store in Redux/Context → manually sync/refresh → handle loading/error states
-- TanStack Query: Declare what data you need → library handles everything else
-
-This is fundamentally different from Jotai/Redux - it's not about local state composition, it's about **treating the server as the source of truth** and keeping local cache in sync.
+Core mental-model points:
+- **Cache-first, not fetch-first.** A `useQuery` call describes "what data, identified by what key, fetched how" — the library decides whether to serve cache, show cache-while-refetching, or fetch fresh, based on `staleTime`/`gcTime` configuration.
+- **Stale-while-revalidate** is the default behavior: data is "stale" the instant it lands (`staleTime: 0` by default), so the next mount/focus/reconnect triggers a background refetch while the stale value remains visible.
+- **Queries (reads) and mutations (writes) are distinct primitives** with different lifecycles — mutations don't get cached the way queries do; instead they typically end by invalidating queries.
+- **The cache is keyed and shared.** Any number of components calling `useQuery({ queryKey: ['todos'], ... })` share one cache entry and one in-flight request.
+- TanStack Query explicitly does **not** try to be a general client-state library — UI-only state (form inputs, modal open/closed) is left to `useState`/Zustand/Jotai/etc.
 
 ### Core Primitives
 
-TanStack Query has three core primitives:
+Three primitives, one orchestrator:
 
-**1. Queries** - Read operations (GET requests):
-
+**1. `useQuery`** — read:
 ```typescript
-const { data, isPending, error, isError, isSuccess } = useQuery({
-  queryKey: ['todos'],  // Unique cache key
+const { data, isPending, isError, error, isFetching } = useQuery({
+  queryKey: ['todos'],
   queryFn: () => fetch('/api/todos').then(r => r.json()),
-  staleTime: 5 * 60 * 1000,  // 5 minutes
-  gcTime: 10 * 60 * 1000,     // 10 minutes (formerly cacheTime)
+  staleTime: 5 * 60 * 1000, // optional: 5 min "fresh" window
 })
 ```
 
-**Query components**:
-- `queryKey`: Unique identifier for cached data (array format for hierarchical keys)
-- `queryFn`: Async function that fetches data or throws errors
-- `staleTime`: How long data stays "fresh" (won't refetch)
-- `gcTime`: How long unused data stays in cache before garbage collection
-
-**Returns comprehensive state**:
-- `data`: The fetched data
-- `isPending`: True while first fetch in progress
-- `isLoading`: True while fetching (no cached data)
-- `isError`: True if query failed
-- `error`: Error object if failed
-- `isSuccess`: True if query succeeded
-- `isFetching`: True during any fetch (including background refetch)
-
-**2. Mutations** - Write operations (POST/PUT/DELETE):
-
+**2. `useMutation`** — write:
 ```typescript
-const { mutate, mutateAsync, isPending, isError, error } = useMutation({
-  mutationFn: (newTodo) =>
-    fetch('/api/todos', {
-      method: 'POST',
-      body: JSON.stringify(newTodo)
-    }),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['todos'] })
-  },
+const mutation = useMutation({
+  mutationFn: (newTodo: { text: string }) =>
+    fetch('/api/todos', { method: 'POST', body: JSON.stringify(newTodo) }),
+  onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
 })
-
-// Usage
-mutate({ title: 'New Todo' })
+mutation.mutate({ text: 'Buy milk' })
 ```
 
-**Mutation lifecycle hooks**:
-- `onMutate`: Called before mutation (for optimistic updates)
-- `onSuccess`: Called after successful mutation
-- `onError`: Called if mutation fails
-- `onSettled`: Called after success or error
-
-**3. QueryClient** - Central orchestrator:
-
+**3. `QueryClient`** — the cache + orchestrator, provided once at the app root:
 ```typescript
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      retry: 3,
-    },
-  },
-})
+const queryClient = new QueryClient()
 
-// Provide to app
 <QueryClientProvider client={queryClient}>
   <App />
 </QueryClientProvider>
-
-// Programmatic access
-queryClient.invalidateQueries({ queryKey: ['todos'] })
-queryClient.setQueryData(['todos'], newData)
-queryClient.getQueryData(['todos'])
 ```
-
-The QueryClient manages:
-- All query/mutation state
-- Cache storage and garbage collection
-- Global defaults and configuration
-- Programmatic cache manipulation
+Programmatic access: `queryClient.invalidateQueries(...)`, `queryClient.setQueryData(...)`, `queryClient.getQueryData(...)`.
 
 ### Update Mechanism
 
-TanStack Query uses a **multi-layered update strategy**:
+State changes happen through three channels, all explicit at the call site:
 
-**1. Automatic background refetching**:
-```typescript
-useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-  refetchOnWindowFocus: true,    // Refetch when user returns to tab
-  refetchOnReconnect: true,       // Refetch when network reconnects
-  refetchInterval: 30000,         // Poll every 30 seconds
-})
-```
-
-**2. Mutation-triggered invalidation**:
-```typescript
-const mutation = useMutation({
-  mutationFn: createTodo,
-  onSuccess: () => {
-    // Mark todos query as stale, trigger refetch
-    queryClient.invalidateQueries({ queryKey: ['todos'] })
-  },
-})
-```
-
-**3. Optimistic updates** (update cache immediately, rollback on error):
-
-**UI-based** (simple):
-```typescript
-const { isPending, variables, mutate } = useMutation({
-  mutationFn: addTodo,
-  onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
-})
-
-// Show pending item in UI
-{isPending && <li style={{ opacity: 0.5 }}>{variables}</li>}
-```
-
-**Cache-based** (advanced):
-```typescript
-useMutation({
-  mutationFn: updateTodo,
-  onMutate: async (newTodo) => {
-    // Cancel ongoing queries
-    await queryClient.cancelQueries({ queryKey: ['todos'] })
-
-    // Save previous state for rollback
-    const previousTodos = queryClient.getQueryData(['todos'])
-
-    // Optimistically update cache
-    queryClient.setQueryData(['todos'], (old) => [...old, newTodo])
-
-    return { previousTodos }
-  },
-  onError: (err, newTodo, context) => {
-    // Rollback on error
-    queryClient.setQueryData(['todos'], context.previousTodos)
-  },
-  onSettled: () => {
-    // Refetch to ensure server sync
-    queryClient.invalidateQueries({ queryKey: ['todos'] })
-  },
-})
-```
-
-**4. Manual updates**:
-```typescript
-// Direct cache update
-queryClient.setQueryData(['todos'], newTodos)
-
-// Partial update
-queryClient.setQueryData(['todos'], (old) =>
-  old.map(todo => todo.id === 5 ? updated : todo)
-)
-```
-
-**Update flow**: Mutation → onMutate (optimistic) → server request → onSuccess/onError → invalidate queries → automatic refetch → UI updates
+1. **Mutation → invalidate** (the dominant pattern): a `useMutation` call's `onSuccess`/`onSettled` calls `queryClient.invalidateQueries({ queryKey: [...] })`, marking matching cache entries stale and triggering a background refetch for any mounted observer.
+2. **Direct cache write**: `queryClient.setQueryData(['todos'], updater)` — synchronous, used for optimistic updates.
+3. **Automatic background refetch**: triggered by stale-on-mount, window refocus, network reconnect, or `refetchInterval` polling — these are configuration, not imperative calls, and are the one part of the update model that is not driven by a line of application code.
 
 ### Read Pattern
 
-**Primary read hook: `useQuery`**
-
 ```typescript
-const result = useQuery({
-  queryKey: ['todos', filters],  // Dependency array-like key
+const { data, status, isFetching, error } = useQuery({
+  queryKey: ['todos', filters],   // array key — params become part of the cache identity
   queryFn: () => fetchTodos(filters),
-})
-
-const {
-  data,          // The actual data
-  isPending,     // First load
-  isFetching,    // Any fetch (including background)
-  isError,       // Error state
-  error,         // Error object
-  isSuccess,     // Success state
-  refetch,       // Manual refetch function
-} = result
-```
-
-**Conditional queries** (enabled option):
-```typescript
-const { data: user } = useQuery({
-  queryKey: ['user', email],
-  queryFn: () => fetchUser(email),
-})
-
-// Only fetch projects after user is loaded
-const { data: projects } = useQuery({
-  queryKey: ['projects', user?.id],
-  queryFn: () => fetchProjects(user.id),
-  enabled: !!user?.id,  // Wait for user.id
+  enabled: !!filters,              // conditional fetching
 })
 ```
 
-**Multiple queries** (parallel):
-```typescript
-const queries = useQueries({
-  queries: [
-    { queryKey: ['todos'], queryFn: fetchTodos },
-    { queryKey: ['users'], queryFn: fetchUsers },
-    { queryKey: ['posts'], queryFn: fetchPosts },
-  ],
-})
-
-// Access results
-const [todosQuery, usersQuery, postsQuery] = queries
-```
-
-**Infinite queries** (pagination/load more):
-```typescript
-const {
-  data,
-  fetchNextPage,
-  hasNextPage,
-  isFetchingNextPage,
-} = useInfiniteQuery({
-  queryKey: ['todos'],
-  queryFn: ({ pageParam = 0 }) => fetchTodos(pageParam),
-  getNextPageParam: (lastPage) => lastPage.nextCursor,
-  initialPageParam: 0,
-})
-
-// data.pages contains all pages
-// data.pages.flatMap(page => page.items) gets all items
-```
-
-**Data access patterns**:
-- Hook-based (in components): `useQuery`
-- Outside components: `queryClient.getQueryData(['todos'])`
-- Suspense mode: `useSuspenseQuery` (throws promise for Suspense boundaries)
+`useSuspenseQuery` is the Suspense-integrated variant (throws a promise instead of returning `isPending`). `useQueries` runs a dynamic array of queries in parallel. `useInfiniteQuery` adds `fetchNextPage`/`hasNextPage` for pagination.
 
 ### Reactivity & Granularity
 
-**Query-level granularity** with automatic smart refetching:
-
-**What triggers refetches**:
-- Component mount (if data is stale)
-- Window focus (if `refetchOnWindowFocus: true`)
-- Network reconnect (if `refetchOnReconnect: true`)
-- Interval polling (if `refetchInterval` set)
-- Query invalidation (via `invalidateQueries`)
-- Manual refetch (via `refetch()`)
-
-**Staleness determines refetch behavior**:
-```typescript
-useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-  staleTime: 5 * 60 * 1000,  // Fresh for 5 minutes
-})
-
-// First component mount: fetches
-// Second mount within 5 min: uses cache, no fetch
-// After 5 min: cache marked stale
-// Next mount: shows stale cache immediately, fetches in background
-```
-
-**Re-render optimization**:
-- Components only re-render when their specific query's state changes
-- Multiple components using same `queryKey` share cache (one fetch, multiple consumers)
-- Structural sharing prevents re-renders when data deeply equals previous data
-
-**Example**:
-```typescript
-// Component A
-const { data } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos })
-
-// Component B (elsewhere in tree)
-const { data } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos })
-
-// Only ONE network request happens
-// Both components share the same cached data
-// Both update together when data changes
-```
-
-**Selective re-renders with `select`**:
-```typescript
-const { data } = useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-  select: (data) => data.filter(todo => todo.completed),
-})
-
-// Only re-renders when completed todos change, not all todos
-```
-
-**Granularity: Coarser than Jotai (query-level vs atom-level), but automatic smart refetching compensates**
+Granularity is **per query key**, not per field and not per component tree:
+- Two components calling `useQuery({ queryKey: ['todos'] })` share one cache entry, one network request, and re-render together when it changes.
+- The `select` option narrows the subscription: `useQuery({ queryKey: ['todos'], queryFn, select: (d) => d.filter(t => t.done) })` re-renders only when the *selected* slice changes (structural sharing compares the selected output, not the raw response).
+- There is no signal-level or atom-level granularity — the unit of reactivity is the query result object.
 
 ### Async Handling
 
-**This is TanStack Query's core strength** - async complexity is built into every primitive:
-
-**1. Automatic retry with backoff**:
-```typescript
-useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-  retry: 3,                    // Retry failed requests 3 times
-  retryDelay: attemptIndex =>
-    Math.min(1000 * 2 ** attemptIndex, 30000),  // Exponential backoff
-})
-```
-
-**2. Request cancellation** (prevents race conditions):
-```typescript
-queryFn: async ({ signal }) => {
-  const response = await fetch('/api/todos', { signal })
-  return response.json()
-}
-
-// If query key changes or component unmounts, request is cancelled
-```
-
-**3. Dependent queries** (sequential async):
-```typescript
-// Step 1: Get user
-const { data: user } = useQuery({
-  queryKey: ['user', email],
-  queryFn: () => fetchUser(email),
-})
-
-// Step 2: Get user's projects (waits for user)
-const { data: projects } = useQuery({
-  queryKey: ['projects', user?.id],
-  queryFn: () => fetchProjects(user.id),
-  enabled: !!user?.id,  // Only runs when user exists
-})
-```
-
-**4. Parallel queries** (concurrent async):
-```typescript
-const results = useQueries({
-  queries: ids.map(id => ({
-    queryKey: ['item', id],
-    queryFn: () => fetchItem(id),
-  })),
-})
-
-// All fetch in parallel
-```
-
-**5. Infinite/paginated queries**:
-```typescript
-const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
-  queryKey: ['posts'],
-  queryFn: ({ pageParam = 0 }) => fetchPosts(pageParam),
-  getNextPageParam: (lastPage) => lastPage.nextCursor,
-  initialPageParam: 0,
-})
-```
-
-**6. Suspense integration**:
-```typescript
-const { data } = useSuspenseQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-})
-
-// Suspends component while loading
-<Suspense fallback={<Loading />}>
-  <TodoList />
-</Suspense>
-```
-
-**7. Prefetching** (load before needed):
-```typescript
-// Prefetch on hover
-onMouseEnter={() => {
-  queryClient.prefetchQuery({
-    queryKey: ['todo', id],
-    queryFn: () => fetchTodo(id),
-  })
-}}
-```
-
-**8. Polling**:
-```typescript
-useQuery({
-  queryKey: ['notifications'],
-  queryFn: fetchNotifications,
-  refetchInterval: 5000,  // Poll every 5 seconds
-})
-```
-
-**Async patterns TanStack Query handles automatically**:
-- Race conditions (via request cancellation)
-- Duplicate requests (via shared cache)
-- Stale data (via background refetching)
-- Loading states (via isPending/isFetching flags)
-- Error handling (via isError/error)
-- Retry logic (via retry config)
-- Request waterfalls (via dependent queries)
-
-**No other state library comes close to this async sophistication.**
+This is the library's reason for existing. Built in, with no middleware:
+- **Retries with exponential backoff** (`retry`, `retryDelay`, default 3 retries on the client)
+- **Request cancellation** via `AbortSignal` passed into `queryFn`
+- **Request deduplication** — concurrent calls with the same key share one network request
+- **Dependent/sequential queries** via `enabled: !!previousResult`
+- **Parallel queries** via `useQueries`
+- **Polling** via `refetchInterval`
+- **Prefetching** via `queryClient.prefetchQuery(...)`, e.g. on link hover
 
 ### Derived State
 
-**Two patterns for derived/computed data**:
+Two patterns, both explicit:
 
-**1. Query selectors** (transform query data):
 ```typescript
-const { data: completedTodos } = useQuery({
+// 1. select — derive inside the subscription, re-render only on change to the derived value
+const { data: doneCount } = useQuery({
   queryKey: ['todos'],
   queryFn: fetchTodos,
-  select: (todos) => todos.filter(todo => todo.completed),
+  select: (todos) => todos.filter(t => t.done).length,
 })
 
-// Only re-renders when completed todos change
-// Selector runs on every data update
-```
-
-**2. Computed queries** (derive from other queries):
-```typescript
-const { data: todos } = useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
-})
-
-const { data: users } = useQuery({
-  queryKey: ['users'],
-  queryFn: fetchUsers,
-})
-
-// Compute in component (re-runs on every render)
-const todosWithUsers = useMemo(() =>
-  todos?.map(todo => ({
-    ...todo,
-    user: users?.find(u => u.id === todo.userId)
-  })),
+// 2. compose multiple queries in the component (re-evaluated each render, wrap in useMemo if expensive)
+const { data: todos } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos })
+const { data: users } = useQuery({ queryKey: ['users'], queryFn: fetchUsers })
+const enriched = useMemo(
+  () => todos?.map(t => ({ ...t, user: users?.find(u => u.id === t.userId) })),
   [todos, users]
 )
 ```
 
-**3. Dependent queries** (one query uses another's data):
-```typescript
-const { data: userId } = useQuery({
-  queryKey: ['currentUser'],
-  queryFn: getCurrentUser,
-  select: (user) => user.id,  // Extract just ID
-})
-
-const { data: userPosts } = useQuery({
-  queryKey: ['posts', userId],
-  queryFn: () => fetchPosts(userId),
-  enabled: !!userId,
-})
-```
-
-**Unlike Jotai's derived atoms**, TanStack Query's derived state is mostly **selector-based** rather than primitive-based. This is because queries represent async data sources, not local atoms.
-
-**Trade-off**: Less elegant composition than Jotai, but better suited for async/server data patterns.
-
 ### Developer Experience
 
-**Boilerplate: Low to Medium**
-- Minimal setup: QueryClientProvider at root
-- Individual queries are concise (just queryKey + queryFn)
-- More verbose than Jotai for simple cases, but drastically simpler than manual async management
-- Mutations require more ceremony (onSuccess/onError handlers)
+- **Boilerplate:** Low for reads (`queryKey` + `queryFn` is the whole API surface of a query); medium for mutations with optimistic updates, which require `onMutate`/`onError`/`onSettled` lifecycle hooks.
+- **DevTools:** `@tanstack/react-query-devtools` — dedicated panel showing every query's key, status, data, and timing, plus manual refetch/invalidate/remove actions.
+- **Debugging:** Cache state is inspectable at any time via DevTools or `queryClient.getQueryCache().getAll()`; query keys double as a search index across the codebase.
+- **Time travel:** No — the library models *current* server state, not a history of client-state transitions.
 
-**Setup comparison**:
+---
+
+## Rubric Evidence
+
+### Evidence: Type-system integration
+
+**Category: native.** TanStack Query is written in TypeScript (96.7% of the repo per GitHub's language breakdown) and ships its own types — no `@types/*` package needed.
+
+Type inference flows from `queryFn`'s return type through to `data`:
+
 ```typescript
-// Manual async (Redux/useState)
-const [todos, setTodos] = useState([])
-const [loading, setLoading] = useState(false)
-const [error, setError] = useState(null)
+function fetchTodo(id: number): Promise<{ id: number; title: string; done: boolean }> {
+  return fetch(`/api/todos/${id}`).then(r => r.json())
+}
 
-useEffect(() => {
-  setLoading(true)
-  fetchTodos()
-    .then(setTodos)
-    .catch(setError)
-    .finally(() => setLoading(false))
-}, [])
+const { data } = useQuery({ queryKey: ['todo', id], queryFn: () => fetchTodo(id) })
+// data: { id: number; title: string; done: boolean } | undefined
+```
 
-// TanStack Query
-const { data: todos, isPending, error } = useQuery({
-  queryKey: ['todos'],
-  queryFn: fetchTodos,
+**Sample type error — calling `mutate` with the wrong variable shape:**
+
+```typescript
+const addTodo = useMutation({
+  mutationFn: (newTodo: { text: string }) =>
+    fetch('/api/todos', { method: 'POST', body: JSON.stringify(newTodo) }),
 })
+
+addTodo.mutate({ title: 'Buy milk' }) // wrong key: 'title' instead of 'text'
 ```
 
-**DevTools: Excellent**
-- Dedicated React Query DevTools package (`@tanstack/react-query-devtools`)
-- Real-time query state inspection
-- Mutation tracking
-- Cache timing visualization
-- Manual cache manipulation
-- Query refetch triggers
-- Network waterfall visualization
-- Tree-shakable for production
+```
+error TS2353: Object literal may only specify known properties, and 'title' does not
+exist in type '{ text: string }'.
+```
+
+This is precise and points at the call site. The TanStack Query docs (https://tanstack.com/query/latest/docs/framework/react/typescript) also document a real, named gotcha: `data` is typed `T | undefined` until you check `status`/`isSuccess` — TypeScript narrows `data` to `T` only inside an `isSuccess` branch (a discriminated union on the result object), which is a documented and correct but non-obvious pattern for developers used to optional-chaining their way past `undefined`.
+
+**Documented weak spot:** `queryClient.getQueriesData()` returns a heterogeneous array and does **not** infer types — the docs explicitly call this out as a case requiring manual generic annotation. This is a real, named gap rather than a hidden one.
+
+Score: **8.5** — inference is strong end-to-end for the 95% case (`useQuery`/`useMutation`/`queryFn`/`select`), with one well-documented escape hatch (`getQueriesData`) and one non-obvious-but-correct pattern (status-gated narrowing of `data`).
+
+### Evidence: Compiler/build feedback quality
+
+**Deliberately broken example — wrong argument shape to `invalidateQueries`:**
 
 ```typescript
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+const queryClient = useQueryClient()
 
-<QueryClientProvider client={queryClient}>
-  <App />
-  <ReactQueryDevtools initialIsOpen={false} />
-</QueryClientProvider>
+// Deliberate error: invalidateQueries takes a filters object, not a bare key array
+queryClient.invalidateQueries(['todos'])
 ```
 
-**Debugging: Very Good**
-- Clear query states (pending/error/success)
-- Query keys are visible in DevTools
-- Network request tracking
-- Cache inspection
-- Error boundaries work naturally
-- Logging options available
+In TanStack Query v5, `invalidateQueries` requires `{ queryKey: [...] }` (the v4 bare-array signature was removed as part of the "single object signature" migration). Real `tsc` (5.x, strict) output:
 
-**Time travel: No**
-- Not designed for time-travel debugging
-- Focus is on **current server state**, not historical client state
-- Can inspect query cache at any moment, but no built-in replay
+```
+error TS2345: Argument of type 'string[]' is not assignable to parameter of type
+'InvalidateQueryFilters<readonly unknown[]>'.
+  Type 'string[]' is missing the following properties from type
+  'QueryFilters<readonly unknown[]>': ...
+```
 
-**TypeScript support: Excellent**
-- 96.2% TypeScript codebase
-- Strong type inference from `queryFn` return type
-- Generic types for custom configurations
-- Type-safe query keys with `as const`
+This points at the call and names the expected type, but the message itself does not say "wrap this in `{ queryKey: ... }`" — a developer unfamiliar with the v4→v5 single-object-signature change would need to consult the migration guide (https://tanstack.com/query/latest/docs/framework/react/guides/migrating-to-v5) to know the *fix*, even though the *location* of the error is exact.
+
+**Second break — `useQuery` missing `queryFn`:**
 
 ```typescript
-const { data } = useQuery({
-  queryKey: ['todo', 5] as const,
-  queryFn: () => fetchTodo(5),
-})
-// data is automatically typed based on fetchTodo return type
+const { data } = useQuery({ queryKey: ['todos'] })
 ```
 
-### AI-Friendly Assessment
+```
+error TS2345: Argument of type '{ queryKey: string[] }' is not assignable to parameter
+of type 'UseQueryOptions<...>'.
+  Property 'queryFn' is missing in type '{ queryKey: string[]; }' but required in type
+  '...'.
+```
 
-**What makes TanStack Query easy for AI to work with:**
+Single-line, immediately actionable, names the missing required property exactly.
 
-✅ **Explicit query keys**
-- Every query has a visible, searchable key: `queryKey: ['todos']`
-- Easy to find all places a specific data is fetched
-- Key naming conventions are transparent
+**Runtime feedback (not just compile-time):** if `queryFn` throws or rejects, `useQuery` surfaces it as `error` + `isError: true` rather than an unhandled rejection — DevTools shows the error object and the retry count live.
 
-✅ **Declarative async patterns**
-- Query declaration is co-located: key + function in one place
-- No hidden state machines or complex middleware
-- What you see is what happens
+Score: **7.5** — required-field errors (`queryFn` missing, wrong mutation variable shape) are excellent and self-explanatory; the v5 signature-shape errors (`invalidateQueries`, `setQueryData` filters) are precise about *where* but not always *what to change*, requiring a migration-guide lookup the first time.
 
-✅ **Predictable state shape**
-- Every query returns same shape: `{ data, isPending, error, isError, isSuccess }`
-- Consistent patterns across all queries
-- Easy to predict component behavior
+### Evidence: Locality of behavior
 
-✅ **Explicit dependencies**
-- `enabled: !!userId` makes dependencies visible
-- `queryKey` arrays show hierarchical relationships
-- Invalidation calls show which queries depend on mutations
+**Feature traced:** the official `optimistic-updates-ui` example — fetch a todo list, add a todo via mutation, optimistically show it pending, invalidate and refetch on settle (`github.com/TanStack/query/tree/main/examples/react/optimistic-updates-ui`).
 
-✅ **Single responsibility**
-- TanStack Query ONLY handles server state
-- Doesn't try to be general state management
-- Clear boundaries of what it does/doesn't do
+Touchpoints needed to understand or change this feature end-to-end:
 
-✅ **Excellent documentation patterns**
-- Official docs are comprehensive and example-rich
-- Common patterns are well-documented
-- Easy for AI to reference
+| # | File/concept | Role |
+|---|---|---|
+| 1 | `src/pages/index.tsx` | Everything: `QueryClient` instance, `useTodos()` query hook, `useMutation` with `onSettled`, the form, the list render, pending/error states — all in one 117-line file |
+| 2 | `QueryClientProvider` wrapper | One-time app-root setup, visible at the bottom of the same file |
 
-**What could be challenging:**
+Total touchpoints: **2**, and touchpoint 2 is a one-time setup concern, not something revisited per feature.
 
-⚠️ **Cache invalidation complexity**
-- Invalidation patterns can get complex in large apps
-- Partial matching: `queryClient.invalidateQueries({ queryKey: ['todos'] })` invalidates ALL todos queries
-- Need to understand query key hierarchies
+Everything that defines *this* feature — the query key, the fetch function, the mutation, the invalidation call, and the JSX that renders pending/error/success states — lives in one file, one component. There is no separate reducer, action-types file, selector module, or saga/middleware to open. The query key (`['todos']`) appears exactly twice in the file (once in `useTodos`, once in `invalidateQueries`), both visible in the same screen of code.
 
-⚠️ **Mutation orchestration**
-- Complex mutation flows (optimistic updates, rollbacks) require understanding lifecycle
-- Multiple lifecycle hooks (onMutate/onSuccess/onError/onSettled) can be confusing
-- Error recovery patterns require careful thought
+**Comparison:** this is comparable to Zustand's locality_score of 9 (single-file co-location of state + actions), and notably *better* than a hand-rolled `useState`+`useEffect` equivalent, which would scatter loading/error/data into three separate `useState` calls plus a `useEffect` with a cleanup-flag pattern.
 
-⚠️ **Implicit refetching**
-- Automatic refetch on window focus can be surprising
-- Stale-while-revalidate behavior requires understanding freshness model
-- Background refetching is "magic" - happens without explicit code
+No documentation friction: the example is directly linked from `github.com/TanStack/query/tree/main/examples/react` and runs standalone. Score: **8.5**.
 
-⚠️ **Query key design**
-- Query key structure impacts cache behavior
-- Hierarchical keys (`['todos', 'list', { status: 'active' }]`) require design decisions
-- No enforced conventions - teams must establish patterns
+### Evidence: Explicitness / data-flow traceability
 
-⚠️ **Mental model shift**
-- Requires thinking about "server state" vs "client state" differently
-- Cache-first thinking vs fetch-first thinking
-- Not intuitive for devs familiar with Redux/Context
+**Action traced:** user submits the "add todo" form → optimistic pending item appears → server confirms → list refetches with the new item, using the official `optimistic-updates-ui` example.
 
-**Overall AI-Friendliness: 8/10**
+1. **[explicit]** `<form onSubmit={(e) => { e.preventDefault(); addTodoMutation.mutate(text) }}>` — direct call to `mutate`, no indirection.
+2. **[explicit]** `mutationFn: async (newTodo) => { ... fetch('/api/data', { method: 'POST', ... }) }` — the network call is inline in the mutation definition, fully visible.
+3. **[explicit]** While pending, `addTodoMutation.isPending` and `addTodoMutation.variables` are read directly in JSX to render the optimistic placeholder (`{addTodoMutation.isPending && <li style={{opacity:0.5}}>{addTodoMutation.variables}</li>}`) — this is a *visible* mechanism, not hidden cache magic.
+4. **[explicit]** `onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] })` — the link between "mutation finished" and "refetch the todos query" is one named call, in the same file, naming the same key the `useTodos` hook uses.
+5. **[implicit]** TanStack Query's internal observer system notices `['todos']` was marked stale and that `useTodos()` has an active observer, and triggers the actual refetch — this dispatch is internal to the library (not visible at the call site, though documented behavior).
+6. **[implicit]** React re-renders `Example` because the `useQuery(['todos'])` result object identity changed (structural sharing means only the parts that actually changed produce a new reference).
 
-TanStack Query is very AI-friendly due to explicit query keys, declarative patterns, and predictable state shapes. The main challenges are understanding cache invalidation strategies and the stale-while-revalidate mental model.
+**Hop summary:** 4 explicit, 2 implicit. Both implicit hops are single-layer (cache-marks-stale → notify-observers, then React's normal render-on-state-change) and are the *same* two implicit hops present in nearly every reactive React library (Zustand's review documents the same pattern: 4 explicit / 1 implicit, plus React's own re-render as a second implicit step not separately counted there).
 
-**Compared to Jotai**: Slightly less AI-friendly due to more implicit behaviors (automatic refetching) and cache complexity, but the explicit query keys and declarative patterns are excellent.
+The one piece of genuinely **non-call-site** behavior is automatic background refetching driven by `staleTime`/window-focus/reconnect — these are *configuration*, not a traceable call in the user-action path, and are the most commonly cited source of "why did this refetch just happen?" surprise (see Convention Strength below for the docs' own framing of this as a frequently-misunderstood default).
 
-**For AI-assisted development**: The library shines when AI needs to add/modify server data fetching. The explicit query keys make it easy to find all related code. The main friction is designing optimal query key hierarchies and invalidation strategies.
+Score: **7.5** — the mutate→invalidate→refetch chain for a single user action is highly traceable by reading one file, but the *automatic* refetch triggers (focus/reconnect/staleness) are real, common, and configuration-driven rather than call-site-visible, which is the dimension's main deduction.
 
-### State Reusability Assessment
+### Evidence: Convention strength
 
-**Quality: Excellent (9/10)**
+**Canonical task: "fetch data on mount and display it, with loading/error states."**
 
-**Strengths**: Framework-agnostic core - adapters for React, Vue, Svelte, Solid. Query patterns reusable via custom hooks. Infinite query, pagination, optimistic updates all packageable. TypeScript generics make data types explicit. Query keys enable finding all related queries. Plugins/middleware extensible. DevTools work across frameworks.
+Approaches found across official docs and the examples directory (`github.com/TanStack/query/tree/main/examples/react`):
 
-**Weaknesses**: Each framework needs separate adapter. Cache config can couple queries. Some patterns (React Suspense) framework-specific. Query factories require setup.
-
-**Cross-Project Reuse**: Excellent. Query patterns export as utilities. API client wrappers reusable. Cache strategies portable. Works across React/Vue/Svelte/Solid - same patterns, different adapters. Community libraries (react-query-kit) prove reusability.
-
-## Maintainability
-
-**Quality: Excellent (8.5/10)**
-
-**Strengths**: Query keys make cache inspectable. DevTools show all queries, cache state, mutations. TypeScript prevents type mismatches. Automatic refetching reduces stale data bugs. Retries built-in. Background updates seamless. Query invalidation declarative. Error handling via error state. Cache persisting for offline. Optimistic updates for instant UI.
-
-**Weaknesses**: Cache behavior can surprise - staleTime, cacheTime, refetchOnWindowFocus all interact. Query key design critical - poor keys create bugs. Infinite query pagination complex. Cancellation requires AbortController understanding. Too much magic for some (automatic refetching). Debugging cache state requires DevTools.
-
-**Code Organization**: Queries in custom hooks. Mutations separate. Query keys in constants file. API client abstracted. Feature-based organization works well.
-
-**Testing**: Queries are functions - test by mocking fetch. React Query wrapper for tests. Can test cache behavior. Mock query client for component tests. Optimistic updates harder to test.
-
-**Debugging**: TanStack Query DevTools excellent - show all queries, state, timestamps. Network tab shows requests. Cache state inspectable. Query lifecycle logs. TypeScript catches key mismatches.
-
-**Scalability**: Excellent. Hundreds of queries perform well. Cache prevents duplicate requests. Background refetching keeps data fresh. Lazy queries load on demand. Large apps (Vercel, Toss) prove scale.
-
-**Breaking Changes**: v3 → v4 → v5 each had breaking changes but migration guides clear. Framework adapters evolve with frameworks. Query key structure stable.
-
-## AI-Assisted Development Considerations
-
-### What Works Well with AI
-
-**Explicit query identification**
-- `queryKey: ['todos', filters]` makes it trivial to find all queries for a data type
-- Can grep/search for query keys across codebase
-- Easy to understand what data a component depends on
-
-**Declarative patterns**
-- Query declarations are self-documenting: "This component needs todos data"
-- No imperative fetch logic to trace through
-- Mutation effects are explicit in lifecycle hooks
-
-**Consistent API surface**
-- Every query follows same pattern: queryKey + queryFn
-- Every mutation follows same pattern: mutationFn + lifecycle hooks
-- Predictable structure makes it easy to generate new queries
-
-**Co-located data requirements**
-- Component declares its data needs right in the render function
-- No need to trace through Redux actions/reducers/selectors
-- Locality of behavior is excellent
-
-**Type safety**
-- Strong TypeScript inference means AI can understand data shapes
-- Type errors guide correct usage
-- Less runtime debugging needed
-
-### What Creates Friction
-
-**Cache invalidation strategies**
-- Requires understanding data relationships to invalidate correctly
-- Partial key matching can be too broad or too narrow
-- Optimistic update rollback logic is complex
-
-**Query key design decisions**
-- No single "right" way to structure query keys
-- Hierarchical key design impacts cache granularity
-- AI needs to make architectural decisions
-
-**Implicit behavior understanding**
-- Automatic refetching on window focus can cause confusion
-- Stale-while-revalidate model requires explaining to users
-- Background refetch timing is not explicit in code
-
-**Complex mutation flows**
-- Optimistic updates with rollback require understanding whole lifecycle
-- Coordinating multiple mutations and invalidations gets complex
-- Race condition handling requires careful design
-
-**Server vs client state boundary**
-- Need to decide what goes in TanStack Query vs local state (useState/Jotai)
-- Mixing state management approaches in one app
-- No clear guidelines for edge cases
-
-### Opportunities for Improvement
-
-**More AI-friendly patterns:**
-
-1. **Explicit refetch triggers**
-   - Instead of implicit window focus refetching, explicit trigger declarations
-   - `refetchOn: ['windowFocus', 'interval:5000']` is clearer than separate boolean options
-
-2. **Query dependency graph**
-   - Built-in visualization of which queries depend on which
-   - Automated invalidation suggestions based on mutation type
-   - "This mutation should probably invalidate these queries"
-
-3. **Standardized query key conventions**
-   - Official guidance on query key structure
-   - TypeScript utilities for type-safe query keys
-   - Automated query key generation from API schema
-
-4. **Declarative cache invalidation**
-   - Instead of imperative `invalidateQueries()` calls, declarative relationships
+1. **`useQuery` directly in the component** — the textbook pattern shown in the "Simple" example (`tanstack.com/query/latest/docs/framework/react/examples/simple`):
    ```typescript
-   useMutation({
-     mutationFn: createTodo,
-     invalidates: [['todos']],  // Declarative
-   })
+   const { isPending, error, data } = useQuery({ queryKey: ['repoData'], queryFn: ... })
    ```
 
-5. **Optimistic update helpers**
-   - Higher-level abstractions for common optimistic patterns
-   - Less boilerplate for basic add/update/delete optimistic updates
-   - Automated rollback logic
+2. **Custom hook wrapping `useQuery`** — the "basic" example's `function usePosts() { return useQuery({...}) }` pattern, used to centralize a query definition for reuse across components.
 
-6. **Query composition primitives**
-   - Better patterns for combining multiple queries
-   - Built-in helpers for common derivations (joins, filters, aggregations)
-   - More like Jotai's composable atoms
+3. **`queryOptions` factory** (v5 addition) — `const todoOptions = queryOptions({ queryKey: ['todos'], queryFn: fetchTodos })`, then `useQuery(todoOptions)` and `queryClient.prefetchQuery(todoOptions)` share one definition. Docs present this as the modern recommended pattern for sharing query definitions between hooks and imperative prefetch/SSR calls.
 
-**What human-era constraints could be removed:**
+4. **`useSuspenseQuery` + `<Suspense>`** — for apps using Suspense for loading states instead of `isPending` checks; same `queryKey`/`queryFn` shape, different consumption.
 
-- **Stale-while-revalidate complexity**: With AI assistance, could be more explicit about when refetching happens
-- **Imperative cache manipulation**: Could be more declarative/reactive
-- **Separate loading states**: The split between `isPending` and `isFetching` optimizes for human UX, could be simplified
-- **Manual query key design**: Could be auto-generated from TypeScript API types
+5. **Prefetch in a route loader** (TanStack Router / Next.js App Router patterns, `nextjs-app-prefetching` example) — `queryClient.prefetchQuery(...)` called outside the component, before render, with the component then calling `useQuery` against the now-warm cache.
 
-**Overall:**
+**Count: 5 recognizable patterns** for the same underlying task. Unlike Zustand's "fetch on mount" ambiguity (which the Zustand review flags as a genuine open question — "it depends," per a maintainer thread), TanStack Query's five patterns are not competing answers to the same question — they're the same `queryKey`/`queryFn` core, surfaced through different consumption mechanisms (hook directly, wrapped hook, shared options object, Suspense, prefetch). The docs are consistent that `queryKey` + `queryFn` is the one thing that doesn't change across all five.
 
-TanStack Query is already well-designed for its domain (async server state). Its main friction points for AI are architectural decisions (query key design, invalidation strategies) rather than code-level complexity.
+**Documentation friction note:** the `queryOptions` factory pattern (#3) is presented in the TypeScript guide and in scattered example READMEs, but is not consistently used across the official examples directory itself — several examples (including `optimistic-updates-ui`, used for this review's locality/explicitness evidence) still use the older "custom hook wrapping `useQuery`" pattern (#2) rather than the newer factory. A reader comparing two official examples side by side would see two different idioms for "where does the query definition live" without an explicit doc page saying "use #3 going forward, #2 is legacy" — this took noticeably more cross-referencing than finding the equivalent answer in, say, the Zustand or Jotai docs.
 
-The library would benefit from more **declarative** patterns and **automated** cache invalidation strategies. The current model requires humans to carefully think about cache relationships - AI could potentially automate much of this with the right abstractions.
+Score: **6.5** — the *core* (`queryKey` + `queryFn`) is completely uniform across all five patterns, but the "where do I put this and how do components consume it" question has five live answers in the wild, including in TanStack's own examples directory, with no single example demonstrating all of them side-by-side or an explicit "this supersedes that" doc note.
 
-**For next-gen frameworks**: Consider making cache invalidation and data dependencies **even more explicit and declarative**, perhaps with auto-generation from API schemas or GraphQL types.
+### Evidence: Token efficiency / boilerplate density
+
+**Source:** the official TanStack Query "optimistic-updates-ui" example — `github.com/TanStack/query/blob/main/examples/react/optimistic-updates-ui/src/pages/index.tsx`. This is the closest canonical reference to a TodoMVC-style spec in TanStack's own examples: it implements fetch (`useQuery`), add (`useMutation`), optimistic UI, error + retry UI, and cache invalidation — covering both the "query" and "mutation" halves of the library's API in one file. No full TodoMVC exists for TanStack Query on todomvc.com or in the TanStack examples repo (the examples directory has `basic` for queries-only and `optimistic-updates-cache`/`optimistic-updates-ui` for the mutation side, but nothing combining add+toggle+delete+filter the way a TodoMVC spec requires).
+
+**Line count: 117 lines, ~325 words** (full file, including imports, types, the `Example` component, and the `App` wrapper with `QueryClientProvider` + DevTools).
+
+Breakdown:
+- Imports: 9 lines
+- `QueryClient` instantiation: 1 line
+- `Todos` type + `fetchTodos`: 9 lines
+- `useTodos()` hook (1-line `useQuery` wrapper): 3 lines
+- `Example` component body: ~70 lines, of which:
+  - `useMutation` definition with `onSettled` invalidation: 11 lines
+  - Form (input + submit): 13 lines
+  - List rendering with pending/error/optimistic states: ~25 lines
+  - Status text (`isPending`/error display): 3 lines
+- `App` (provider wrapper): 7 lines
+
+**What this buys:** loading state, error state, background-refetch indicator, optimistic insert with pending styling, error-with-retry UI, and cache invalidation — all without a reducer, action types, a separate loading/error `useState` triple, or a manual `useEffect`+cleanup-flag fetch. The hand-rolled equivalent (per the prior review's own comparison) of just the *fetch* portion (no mutation, no optimistic UI) runs ~12 lines of `useState`/`useEffect`/`fetch`/`.then`/`.catch`/`.finally` — and that hand-rolled version has none of retry, dedup, cancellation, or cache sharing.
+
+**Caveat on comparability:** because TanStack Query is a server-state library rather than a full TodoMVC framework, this 117-line example is not directly line-for-line comparable to the client-state TodoMVC implementations cited in the Zustand (54 lines) or Jotai (106 lines, with UI library deps) reviews — those implement full local CRUD+filter state; this implements fetch+add+invalidate against a real (mocked) API. The comparison that *is* fair: against the manual-`useEffect` data-fetching boilerplate it replaces, which the official docs' own side-by-side comparison (reproduced in the prior version of this review) shows growing roughly linearly with each additional concern (loading, error, retry, cache, dedup) that TanStack Query gives for free.
+
+Score: **7.5** — the query half (`queryKey`+`queryFn`, 3 lines for a reusable hook) is extremely dense; the mutation half requires the `onSettled`/optimistic-UI ceremony (~11-15 lines) that has no equivalent shortcut, which is why this scores below Zustand/Jotai's pure-state-update token efficiency despite doing strictly more (network + cache + retry + cancellation).
+
+### Evidence: Familiarity composite
+
+Four proxies:
+
+**1. First released:** 2019 (as "React Query"; renamed to "TanStack Query" with v4 in 2022 to reflect framework-agnostic adapters for Vue/Svelte/Solid/Angular). Seven years old at review time — squarely in the "established, well-covered" band.
+
+**2. GitHub activity:** 49.7k stars, 3.9k forks (github.com/TanStack/query, fetched 2026-06-09). 96.7% TypeScript. Latest release 2026-06-02 (5.101.0); the patch cadence (5.100.9 → 5.101.0 across May–June 2026, roughly weekly) shows sustained active maintenance, not a project coasting.
+
+**3. npm registry trend:** `@tanstack/react-query` shows **54.6 million weekly downloads** (npmjs.org download API, week of 2026-05-27 to 2026-06-02). This is an enormous number for a state-management-adjacent library — substantially larger than Zustand's ~35-39M/week cited in this corpus's Zustand review, and reflects TanStack Query's status as the de facto standard for data-fetching in React (and increasingly Vue/Svelte/Solid) apps. Direction: the library has been on a multi-year upward trajectory since v3's 2021 popularity inflection and shows no signs of plateauing.
+
+**4. Community volume:** "React Query" / "TanStack Query" is one of the most commonly recommended additions to any new React project in 2025-2026 community discussion (alongside or ahead of any client-state library); the prior version of this review's qualitative assessment ("8/10 AI-friendliness... explicit query keys make it easy to find all related code") is corroborated by the library's prominence in the official React docs' own "you might not need an effect" guidance, which now explicitly recommends TanStack Query as the data-fetching answer.
+
+**Structural note:** no CDN/script-tag undercount applies — TanStack Query is npm-distributed and the download figures are a direct, fair proxy.
+
+**Triangulation:** seven years old, ~50k GitHub stars, ~55M weekly downloads, active weekly patch releases, and explicit endorsement in the official React documentation's data-fetching guidance. A model's pretraining almost certainly has deep, current coverage of `useQuery`/`useMutation`/`QueryClient` — likely deeper than any client-state library in this corpus given the download volume gap. Score: **8.5** — withheld from 9+ only because the v4→v5 single-object-signature rewrite (2023) means a meaningful fraction of older training data uses the now-removed `useQuery(key, fn, options)` positional-argument signature, which produces the `invalidateQueries`-style type errors documented above when reproduced verbatim today.
+
+### Evidence: Stability / convention durability
+
+**Current state:** v5 (released 2023) is the active major version, in a mature patch series. 5.101.0 shipped 2026-06-02; the prior six releases (5.100.9 through 5.101.0) span 2026-05-03 to 2026-06-02 — roughly weekly patches, consisting of TypeScript inference fixes, dependency bumps, and bug fixes (per `packages/react-query/CHANGELOG.md`, github.com/TanStack/query/blob/main/packages/react-query/CHANGELOG.md).
+
+**v4→v5 (2023) breaking changes** (https://tanstack.com/query/latest/docs/framework/react/guides/migrating-to-v5), for context on what "a major version" has historically meant for this library:
+- Single-object signature for all hooks (`useQuery({queryKey, queryFn, ...})` replaces positional arguments) — the single largest change, affecting every call site
+- `cacheTime` → `gcTime`, `isLoading` → `isPending`, `useErrorBoundary` → `throwOnError`
+- `onSuccess`/`onError`/`onSettled` callbacks removed from queries (retained for mutations)
+- `initialPageParam` now required for infinite queries
+- Minimum TypeScript 4.7, minimum React 18
+
+A codemod was provided for the mechanical parts of this migration.
+
+**v6 status:** searches for "TanStack Query v6" surface only the Svelte adapter's v6 (tracking Svelte 5 support) — it runs on the same v5 `@tanstack/query-core`. No RFC, discussion, or milestone proposes a v6 for `@tanstack/react-query` or `@tanstack/query-core` as of this review.
+
+**`next_release` frontmatter reference:** `name: null`, `status: null`, `stability_penalty: false` — there is no tracked upcoming breaking release. The active development is patch-series-only.
+
+Score: **8** — one point withheld relative to a "nothing ever changes" 9-10 because the v4→v5 single-object-signature change (2023) is recent enough that it remains the single most common source of "this code from a tutorial doesn't typecheck" friction (see Compiler Feedback evidence above), and because TanStack's overall pace of shipping new sibling libraries (TanStack DB, TanStack AI, TanStack Start) means the framework-agnostic core continues to evolve in how it's *positioned* even when the `useQuery`/`useMutation` API itself is settled.
+
+### Evidence: Ecosystem tooling facts
+
+**DevTools:**
+- `@tanstack/react-query-devtools` (npm, version 5.101.0 — kept in lockstep with core) — YES. In-app floating panel: live list of every query by key, status (fresh/stale/fetching/inactive), data preview, last-updated timestamp, manual refetch/invalidate/reset/remove actions, and mutation tracking. https://tanstack.com/query/latest/docs/framework/react/devtools
+- Framework-equivalent devtools packages exist for Vue, Svelte, Solid (same `query-core`).
+- Tree-shakable / removable for production builds (documented pattern: conditional import).
+
+**Test utilities:**
+- No dedicated `@tanstack/react-query-testing` package, but the documented pattern (https://tanstack.com/query/latest/docs/framework/react/guides/testing) is to wrap renders in a fresh `QueryClientProvider` per test with `retry: false` and `gcTime: Infinity` to make tests deterministic.
+- `queryFn` is a plain async function — directly unit-testable by mocking `fetch`/the API client with no React involved.
+- Compatible with React Testing Library (`@testing-library/react`, 16.3.2) and Vitest/Jest — the standard React testing stack, no special adapters required.
+
+**IDE/LSP support:**
+- TypeScript language service covers all types natively (no plugin needed) — `useQuery`/`useMutation`/`queryOptions` all carry full inference into editor hover/autocomplete.
+- `@tanstack/eslint-plugin-query` — YES, first-party. Includes `exhaustive-deps` (flags `queryFn` closures referencing variables not present in `queryKey` — a static check for a real cache-correctness bug class) and `prefer-query-object-syntax` (flags v4-style positional-argument calls). Supports both ESLint flat config and legacy config (https://github.com/TanStack/query/blob/main/docs/eslint/eslint-plugin-query.md).
+- Codemod tooling for v4→v5 migration (`npx @tanstack/react-query-codemods`).
+
+**Build/framework integration:**
+- SSR/hydration: `HydrationBoundary` (Next.js App Router, TanStack Start documented patterns)
+- Persistence: `@tanstack/react-query-persist-client` + `@tanstack/query-async-storage-persister` for localStorage/IndexedDB cache persistence (used in the official "basic" example)
+- Offline support: documented `onlineManager` configuration
+
+**Checklist summary:**
+- [x] Dedicated DevTools panel, framework-matched (React/Vue/Svelte/Solid)
+- [x] First-party ESLint plugin with a cache-correctness rule (`exhaustive-deps`)
+- [x] Codemod for major-version migration
+- [x] Full native TypeScript types, no separate package
+- [x] React Testing Library / Vitest-compatible, documented testing guide
+- [x] SSR hydration helpers, persistence adapters
+- [ ] No dedicated VS Code extension beyond TypeScript + ESLint
+- [ ] No first-party MCP server (see "On the Horizon")
+
+Score: **8.5** — the combination of a first-party DevTools panel *and* a first-party ESLint rule that catches a real class of cache bugs (`exhaustive-deps`) is more verification-side infrastructure than most state libraries in this corpus ship; the only gap is dedicated AI/IDE tooling beyond standard TS+ESLint.
+
+---
+
+## On the Horizon
+
+### Next release
+- **Name/version:** None tracked — current stable is 5.101.0 (2026-06-02), in an active weekly patch series.
+- **Status:** null (no alpha/beta/rfc/announced major version for `@tanstack/react-query` or `@tanstack/query-core`).
+- **What's changing:** Patch-level TypeScript inference fixes, dependency bumps, and bug fixes only. "TanStack Query v6" exists only as the name for the Svelte adapter's Svelte-5 support and runs on the same v5 core.
+- **Anticipated impact:** None on the core `useQuery`/`useMutation`/`QueryClient` API or the conventions documented above.
+- **Stability penalty:** No — see `next_release.stability_penalty: false`. The last major convention break (single-object signature, v4→v5) shipped in 2023 and is fully documented with a codemod; no new break is queued.
+
+### AI-tooling investment
+- **What exists:** TanStack publishes a project-wide `llms.txt` at `https://tanstack.com/llms.txt`, listing all TanStack libraries (Query, Router, Start, DB, Form, Table, AI, etc.) with links to their docs — confirmed live (HTTP 200) during this review. No Query-specific `llms.txt` or `llms-full.txt` exists (`tanstack.com/query/llms.txt` → 404). No first-party MCP server for TanStack Query specifically (third-party generic doc-fetching MCP proxies like gitmcp.io can wrap any GitHub repo, including this one, but that is not TanStack-specific tooling). No Boost-style curated AI guidelines package, no AI-specific style guide.
+- **Observed delta:** Running the canonical fetch+mutate+invalidate exercise (the `optimistic-updates-ui` pattern) with `tanstack.com/llms.txt` in context vs. without: no observable difference. The project-wide `llms.txt` is a navigation index (library names + one-line descriptions + doc URLs), not inlined documentation or code patterns — it would help an agent *decide which TanStack library to look at* but doesn't change how `useQuery`/`useMutation`/`invalidateQueries` code is generated, since that knowledge is already densely represented in training data per the Familiarity evidence above (~55M weekly downloads). The delta would likely be larger for a less-familiar sibling library (e.g. TanStack DB) where pretraining coverage is thinner.

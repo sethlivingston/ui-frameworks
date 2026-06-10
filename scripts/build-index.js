@@ -114,6 +114,7 @@ files.forEach(file => {
       file: file.replace('.md', ''),
       name: frontmatter.name || frontmatter.framework,
       version: frontmatter.version || null,
+      type: frontmatter.type || null,
       category: frontmatter.category || null,
 
       // Links
@@ -144,14 +145,31 @@ files.forEach(file => {
       first_released: frontmatter.first_released || null,
       status: frontmatter.status || null,
 
-      // Scores
-      ai_friendliness_score: frontmatter.ai_friendliness_score || null,
-      reusability_score: frontmatter.reusability_score || null,
-      maintainability_score: frontmatter.maintainability_score || null,
+      // Scores — raw 9-dimension rubric values, passed through as the single
+      // source of truth for any weighted view AGENTIC-DEV-RANKINGS.md computes
+      type_system_score: frontmatter.type_system_score ?? null,
+      compiler_feedback_score: frontmatter.compiler_feedback_score ?? null,
+      locality_score: frontmatter.locality_score ?? null,
+      explicitness_score: frontmatter.explicitness_score ?? null,
+      convention_strength_score: frontmatter.convention_strength_score ?? null,
+      token_efficiency_score: frontmatter.token_efficiency_score ?? null,
+      familiarity_score: frontmatter.familiarity_score ?? null,
+      stability_score: frontmatter.stability_score ?? null,
+      tooling_score: frontmatter.tooling_score ?? null,
+
+      // On the Horizon
+      next_release: frontmatter.next_release || null,
+      ai_tooling: frontmatter.ai_tooling || null,
+
+      // Combo files & rewrite-detection links
+      components: frontmatter.components || null,
+      supersedes: frontmatter.supersedes || null,
+      superseded_by: frontmatter.superseded_by || null,
 
       // Metadata
       reviewed_date: frontmatter.reviewed_date || null,
-      reviewed_by_model: frontmatter.reviewed_by_model || null
+      reviewed_by_model: frontmatter.reviewed_by_model || null,
+      reviewer_notes: frontmatter.reviewer_notes || null
     };
 
     frameworks.push(entry);
@@ -183,12 +201,7 @@ const stats = {
   total: frameworks.length,
   by_paradigm: {},
   by_state_model: {},
-  by_rendering_strategy: {},
-  score_ranges: {
-    ai_friendliness: { min: 10, max: 0, avg: 0 },
-    reusability: { min: 10, max: 0, avg: 0 },
-    maintainability: { min: 10, max: 0, avg: 0 }
-  }
+  by_rendering_strategy: {}
 };
 
 frameworks.forEach(f => {
@@ -206,42 +219,7 @@ frameworks.forEach(f => {
   if (f.rendering_strategy) {
     stats.by_rendering_strategy[f.rendering_strategy] = (stats.by_rendering_strategy[f.rendering_strategy] || 0) + 1;
   }
-
-  // Score statistics
-  if (f.ai_friendliness_score) {
-    stats.score_ranges.ai_friendliness.min = Math.min(stats.score_ranges.ai_friendliness.min, f.ai_friendliness_score);
-    stats.score_ranges.ai_friendliness.max = Math.max(stats.score_ranges.ai_friendliness.max, f.ai_friendliness_score);
-    stats.score_ranges.ai_friendliness.avg += f.ai_friendliness_score;
-  }
-
-  if (f.reusability_score) {
-    stats.score_ranges.reusability.min = Math.min(stats.score_ranges.reusability.min, f.reusability_score);
-    stats.score_ranges.reusability.max = Math.max(stats.score_ranges.reusability.max, f.reusability_score);
-    stats.score_ranges.reusability.avg += f.reusability_score;
-  }
-
-  if (f.maintainability_score) {
-    stats.score_ranges.maintainability.min = Math.min(stats.score_ranges.maintainability.min, f.maintainability_score);
-    stats.score_ranges.maintainability.max = Math.max(stats.score_ranges.maintainability.max, f.maintainability_score);
-    stats.score_ranges.maintainability.avg += f.maintainability_score;
-  }
 });
-
-// Average scores
-const scored_frameworks = frameworks.filter(f => f.ai_friendliness_score);
-stats.score_ranges.ai_friendliness.avg = scored_frameworks.length > 0
-  ? (stats.score_ranges.ai_friendliness.avg / scored_frameworks.length).toFixed(2)
-  : 'N/A';
-
-const reusable_frameworks = frameworks.filter(f => f.reusability_score);
-stats.score_ranges.reusability.avg = reusable_frameworks.length > 0
-  ? (stats.score_ranges.reusability.avg / reusable_frameworks.length).toFixed(2)
-  : 'N/A';
-
-const maintainable_frameworks = frameworks.filter(f => f.maintainability_score);
-stats.score_ranges.maintainability.avg = maintainable_frameworks.length > 0
-  ? (stats.score_ranges.maintainability.avg / maintainable_frameworks.length).toFixed(2)
-  : 'N/A';
 
 console.log('\n📈 Index Statistics:');
 console.log(JSON.stringify(stats, null, 2));

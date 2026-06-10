@@ -5,51 +5,94 @@ github_url: "https://github.com/livewire/livewire"
 docs_url: "https://livewire.laravel.com/docs/"
 implementation_language: "PHP"
 status: "active"
-ai_friendliness_score: 8
-reusability_score: 7.5
-maintainability_score: 7.5
+type_system_score: 5.5
+compiler_feedback_score: 6
+locality_score: 8
+explicitness_score: 8.5
+convention_strength_score: 7.5
+token_efficiency_score: 7.5
+familiarity_score: 6.5
+stability_score: 6.5
+tooling_score: 7.5
+version: "4.3.1"
+ai_tooling:
+  mcp_server:
+    available: false
+    url: null
+    party: null
+  guidelines: "Laravel Boost (https://github.com/laravel/boost) ships a `livewire-development` skill and Livewire-specific guidelines loaded automatically when `livewire/livewire` is detected in composer.json. Part of the official Laravel AI toolchain."
+  llms_txt: false
+  style_guides: null
+  observed_delta: "Laravel Boost's `livewire-development` skill loaded against the canonical counter + todo exercise. Without Boost the model produced correct functional code but used v3-era `getListeners()` return array syntax for event listeners, and used the `#[Computed]` attribute inline without the `persist` vs. none distinction. With Boost loaded: model used v4 `#[On]` attribute syntax, correctly noted `.deep` modifier needed for wire:model on child-wrapped inputs, and unprompted added `wire:key` to list items. Net delta: two idiom corrections (v3-era listener syntax → v4 attribute syntax; missing wire:key) plus one correct modifier use. A real but bounded delta — the main value is closing the v3→v4 migration gap in training data."
+next_release:
+  name: null
+  status: null
+  changes: "v4 shipped January 15, 2026 as the current stable. The v4.x point-release track (latest: 4.3.1, June 2, 2026) is in active maintenance: Islands feature, Blaze compiler, PHP 8.4 property hooks support, single-file components, slots and refs. No v5 roadmap or breaking-change RFCs announced as of this review."
+  anticipated_impact: "No major breaking changes anticipated in the near term. v4 itself introduced several breaking changes from v3 (wire:model event semantics, routing, wire:transition API) — those are already in stable and documented in the upgrade guide. The active 4.x track is additive."
+  stability_penalty: false
+components: null
+supersedes: null
+superseded_by: null
+license: "MIT"
+runtime: "both"
 capabilities:
-  state_management: false
-  rendering: false
-  event_handling: false
+  state_management: true
+  rendering: true
+  event_handling: true
+paradigm: "declarative"
+state_model: "mutable"
+rendering_strategy: "server-side"
+maintainer: "Caleb Porzio / Community"
+first_released: "2019"
+reviewed_date: "2026-06-09"
+reviewed_by_model: "Claude Sonnet 4.6"
+reviewer_notes: "Full from-scratch rewrite under the 9-dimension flat rubric. Version verified from Packagist (4.3.1, June 2, 2026). No TodoMVC listing on todomvc.com for Livewire — used a community TodoMVC-style implementation (YannickYayo/livewire-todolist) plus official v4 docs examples as the token-efficiency reference, following the fallback path from the research brief. The package is PHP/Composer, not npm — npm_package set to null; typescript_support set to null (not applicable). runtime: both — PHP server-side logic plus Livewire's Alpine.js-based browser JS."
 ---
 
 # Laravel Livewire
 
-> **2026 update note (2026-06-07):** Livewire v4 shipped January 2026 with parallel live updates (faster reactivity), a `wire:transition` directive for animations, view-based components that keep PHP and Blade co-located, and an "Islands" feature for isolating reactive regions within a page. The "stay in PHP" philosophy and AJAX-by-default model described below remain the core identity — v4 sharpens the explicitness story (Islands narrows *what* re-renders, similar in spirit to Phoenix LiveView's explicit data flow) rather than replacing it.
+## State Management
 
-## Philosophy & Mental Model
+### Philosophy & Mental Model
 
-Laravel Livewire is a **full-stack framework for Laravel that takes the pain out of building dynamic UIs**. Like Phoenix LiveView, it represents the server-rendered approach to interactivity: keep state and logic on the server, communicate changes via AJAX/WebSocket, and update only what changed in the DOM.
-
-The core philosophy is simple: **stay in PHP**. Instead of writing JavaScript for frontend interactivity and PHP for backend logic, Livewire lets Laravel developers build dynamic interfaces without leaving their comfort zone. This eliminates the frontend/backend split and the impedance mismatch between languages.
+Laravel Livewire's state model is **server-authoritative, mutable, and property-driven**. State lives on the PHP server as public class properties. Every interaction triggers an AJAX round-trip: the browser sends the current property snapshot plus the event name, PHP updates properties directly, and the re-rendered HTML diff returns to the browser. There is no client-side state store — the browser is a thin rendering terminal that forwards events and receives HTML patches.
 
 Mental model:
-- Components are PHP classes with public properties (state)
-- Blade templates define the UI (view)
-- `wire:*` directives bind events and data
-- User interactions trigger server-side methods
-- State changes automatically re-render components
-- Only HTML diffs are sent to the client
+- Public PHP properties on a `Component` class are the state
+- Blade templates directly read those properties by name — no explicit binding step
+- `wire:*` directives connect DOM events to PHP methods
+- After a method completes, Livewire re-renders the component and sends only the changed HTML fragments (via Alpine Morph / morphdom)
 
-The framework sits between traditional server-rendered apps (full page reloads) and SPAs (complex client-side state). You get SPA-like interactivity with server-side simplicity.
-
-**Key difference from Phoenix LiveView**: Livewire uses **AJAX by default** (HTTP requests per interaction), while LiveView uses persistent WebSockets. Livewire v3 added optional WebSocket support via "Livewire Volt" for real-time features, but the default is stateless HTTP.
-
-## State Management
+This is the "stay in PHP" philosophy: instead of splitting a feature between a PHP API and a JavaScript view layer, the entire feature lives in one PHP class plus one Blade template.
 
 ### Core Primitives
 
-State is defined as **public properties** on Livewire component classes:
+- **Public properties** — scalar types (string, int, float, bool, null), arrays, `Eloquent\Collection`, `Eloquent\Model`, `Carbon`, `Stringable`, `BackedEnum`. Custom types need a `Wireable` interface or Synthesizer.
+- **`#[Computed]` methods** — memoized derived state, cached per-request by default, optionally persisted for the component lifetime or application-wide.
+- **`Form` objects** — `Livewire\Form` subclasses encapsulate validation rules and multiple fields as a reusable unit.
+- **`#[Locked]` attribute** — marks a property as server-only, preventing client-side tampering.
+- **`#[Reactive]` attribute** — opts a child component's property into automatic re-hydration when a parent re-renders.
+
+### Update Mechanism
+
+Direct mutation — methods modify `$this->property` in-place:
 
 ```php
+// app/Livewire/Counter.php
 <?php
+
 namespace App\Livewire;
+
 use Livewire\Component;
 
 class Counter extends Component
 {
-    public $count = 0;
+    public int $count = 0;
+
+    public function increment(): void
+    {
+        $this->count++;
+    }
 
     public function render()
     {
@@ -58,95 +101,32 @@ class Counter extends Component
 }
 ```
 
-All public properties are automatically:
-- Serialized and sent to the client
-- Made available to Blade templates
-- Synchronized between requests
-
-**Property types supported**:
-- Primitives: string, int, float, bool, null, array
-- Common objects: Collections, Eloquent models, DateTime/Carbon, Stringable
-- Custom objects (via `Wireable` interface)
-
-### Update Mechanism
-
-State updates happen through **method calls** triggered by `wire:*` directives:
-
-```php
-class Counter extends Component
-{
-    public $count = 0;
-
-    public function increment()
-    {
-        $this->count++;
-    }
-
-    public function decrement()
-    {
-        $this->count--;
-    }
-
-    public function reset()
-    {
-        $this->count = 0;
-    }
-}
-```
-
-Template:
-```blade
-<div>
-    <h1>{{ $count }}</h1>
-    <button wire:click="increment">+</button>
-    <button wire:click="decrement">-</button>
-    <button wire:click="reset">Reset</button>
-</div>
-```
-
-Updates are **mutable**—you modify properties directly. After the method completes, Livewire serializes the updated state, re-renders the component, and sends HTML diffs to the client.
-
-**Helper methods**:
-- `$this->fill(['title' => 'New', 'content' => 'Text'])` - Bulk assign
-- `$this->reset('propertyName')` - Reset to initial value
-- `$this->reset()` - Reset all properties
-- `$this->pull('propertyName')` - Get value and reset
+Helper shortcuts:
+- `$this->fill(['title' => 'New', 'body' => 'Text'])` — bulk assign from array
+- `$this->reset('title')` — reset one property to its default
+- `$this->reset()` — reset all properties
+- `$this->pull('property')` — read and reset in one call
 
 ### Read Pattern
 
-Access properties in Blade templates using standard PHP syntax:
+Properties are available in Blade templates directly by name (no `$this->` prefix). Computed properties require `$this->`:
 
 ```blade
+{{-- resources/views/livewire/counter.blade.php --}}
 <div>
-    <p>Count: {{ $count }}</p>
-    <p>Title: {{ $title }}</p>
-    <p>User: {{ $user->name }}</p>
+    <h1>{{ $count }}</h1>                   {{-- public property --}}
+    <p>{{ $this->total }}</p>               {{-- computed property --}}
+    <button wire:click="increment">+</button>
 </div>
 ```
 
-Properties are automatically available in the template—no explicit passing required.
+The asymmetry between plain properties (`$count`) and computed properties (`$this->total`) in templates is a documented gotcha and a recurring point of confusion.
 
 ### Reactivity & Granularity
 
-**Component-level reactivity**: When any public property changes, the entire component re-renders. Livewire then diffs the HTML and sends only changed fragments to the client.
+Reactivity is **component-scoped**: when any public property changes, the entire component Blade template re-renders server-side and an HTML diff is pushed to the browser. Livewire uses Alpine Morph (morphdom) to patch only changed DOM nodes, preserving focus states, scroll positions, and third-party widget state.
 
-**Parent-child reactivity is NOT automatic** (this is a key difference from Vue/React):
-
-```php
-// Parent
-class PostList extends Component
-{
-    public $posts;
-}
-
-// Child
-class PostItem extends Component
-{
-    public $post;  // NOT reactive by default
-}
-```
-
-To make child properties reactive, use the `#[Reactive]` attribute:
+Parent-child reactivity is **opt-in**: child components do not automatically re-render when parent props change. To enable it, add `#[Reactive]` to the child property:
 
 ```php
 use Livewire\Attributes\Reactive;
@@ -154,58 +134,32 @@ use Livewire\Attributes\Reactive;
 class PostItem extends Component
 {
     #[Reactive]
-    public $post;
+    public Post $post;
 }
 ```
 
-**Why not reactive by default?** Performance. Livewire minimizes data transfer—when a parent updates, only the parent's state is sent to the server, not children's. Reactive properties require additional data on every parent update.
+v4 introduced **Islands** — sub-regions within a component that update independently, avoiding a full component re-render for isolated sections. An island wraps expensive content and can be lazy-loaded or appended to (for infinite scroll):
+
+```blade
+@island
+    <div>Revenue: {{ $this->revenue }}
+    <button wire:click="$refresh">Refresh</button></div>
+@endisland
+```
 
 ### Async Handling
 
-Livewire is inherently synchronous (HTTP request/response), but you can handle async operations through:
+Livewire is synchronous HTTP by default. Async patterns:
 
-**1. Loading states** (built-in UI feedback):
-
-```blade
-<div>
-    <button wire:click="save">Save</button>
-    <span wire:loading>Saving...</span>
-</div>
-```
-
-The `wire:loading` directive shows/hides during requests.
-
-**2. Deferred updates** (background processing):
+1. **`wire:loading`** — built-in visual feedback during any pending request
+2. **Lazy loading** — `wire:init="loadData"` defers a method call to after the initial page render
+3. **Polling** — `wire:poll.5s="refresh"` calls a method on a timer
+4. **Queue dispatch** — methods dispatch Laravel queue jobs for heavy work
+5. **Laravel Echo / Reverb** — `#[On('echo:orders,OrderCreated')]` listens on a WebSocket channel
 
 ```php
-public function save()
-{
-    dispatch(new ProcessDataJob($this->data));
-    $this->dispatch('job-queued');
-}
-```
-
-**3. Polling** (periodic updates):
-
-```blade
-<div wire:poll.5s="refresh">
-    Latest data: {{ $latestData }}
-</div>
-```
-
-Automatically calls `refresh()` method every 5 seconds.
-
-**4. Laravel Echo integration** (real-time events):
-
-```php
-public function getListeners()
-{
-    return [
-        "echo:orders,OrderCreated" => 'orderCreated',
-    ];
-}
-
-public function orderCreated($order)
+#[On('echo:orders,OrderCreated')]
+public function orderCreated(array $order): void
 {
     $this->orders[] = $order;
 }
@@ -213,786 +167,553 @@ public function orderCreated($order)
 
 ### Derived State
 
-Use **computed properties** with the `#[Computed]` attribute:
-
 ```php
 use Livewire\Attributes\Computed;
 
 class ShowUser extends Component
 {
-    public $userId;
+    public int $userId;
 
     #[Computed]
-    public function user()
+    public function user(): User
     {
         return User::find($this->userId);
     }
 
-    #[Computed]
-    public function posts()
+    // Persist across requests (cache_key auto-generated from component+method)
+    #[Computed(persist: true)]
+    public function expensiveStat(): array
     {
-        return $this->user->posts;
+        return Stats::expensiveQuery($this->userId);
     }
 }
 ```
 
-Template (requires `$this->` prefix):
-```blade
-<div>
-    <h1>{{ $this->user->name }}</h1>
-    <p>Posts: {{ $this->posts->count() }}</p>
-</div>
-```
+Cache invalidation is manual — `unset($this->user)` clears the cached value.
 
-**Caching behavior**:
-- **Default**: Cached for single request (if accessed multiple times in one render)
-- **`persist: true`**: Cached for component lifetime (default 3600s)
-- **`cache: true`**: Cached application-wide across all instances
-
-```php
-#[Computed(persist: true)]
-public function user() { ... }
-
-#[Computed(cache: true, key: 'homepage-posts')]
-public function posts() { ... }
-```
-
-**Cache busting**:
-```php
-public function createPost()
-{
-    Auth::user()->posts()->create(...);
-    unset($this->posts);  // Clear computed property cache
-}
-```
+---
 
 ## Rendering
 
-### Core Primitives
+### Philosophy & Approach
 
-Livewire uses **Blade**, Laravel's templating engine:
+Rendering is **server-side HTML diffing**: every interaction round-trips to PHP, Blade re-renders the full component template, and Livewire sends only the changed HTML fragments to the browser, which Alpine Morph applies to the DOM. No virtual DOM on the client — morphdom diffs real HTML strings.
+
+The browser's job is to:
+1. Capture a DOM event
+2. Serialize current form-bound property values
+3. POST the AJAX request to the `/livewire-{hash}/update` endpoint
+4. Receive and apply the HTML diff
+
+### Update Strategy
+
+Default: deferred — `wire:model` without `.live` only syncs property values when an action (form submit, click) fires. This reduces round-trips.
+
+Live updates:
 
 ```blade
-<div>
-    <h1>{{ $title }}</h1>
-
-    @if($show)
-        <p>Visible content</p>
-    @endif
-
-    @foreach($items as $item)
-        <li>{{ $item->name }}</li>
-    @endforeach
-</div>
+<input wire:model.live="search">              {{-- syncs on every keystroke (150ms debounce) --}}
+<input wire:model.live.debounce.300ms="q">    {{-- custom debounce --}}
+<input wire:model.blur="email">              {{-- sync on blur only --}}
 ```
 
-Blade provides:
-- `{{ }}` for escaped output (XSS protection)
-- `{!! !!}` for raw HTML (use cautiously)
-- `@if/@foreach/@for` for control structures
-- `@include/@extends/@section` for composition
+### Reconciliation
 
-### Update Mechanism
+Morphdom (wrapped as Alpine Morph) diffs the old and new HTML string server-side, produces a set of DOM patch instructions, and applies them on the client. Livewire preserves:
+- Focus state on focused inputs
+- Scroll positions (unless `wire:replace` is used)
+- Input values not bound to `wire:model`
+- Third-party widget initialization state
 
-1. User interacts (clicks button, submits form, etc.)
-2. Livewire sends AJAX request with:
-   - Method to call
-   - Current component state (public properties)
-   - Event parameters
-3. Server executes method, updates properties
-4. Livewire re-renders Blade template
-5. DOM diff computed (morphdom algorithm)
-6. Minimal HTML patch sent to client
-7. Client updates DOM intelligently
+### Templating & Syntax
 
-**Performance**: Livewire uses "morphdom" to intelligently update the DOM, preserving:
-- Focus states
-- Scroll positions
-- Input values (if not bound)
-- Third-party widget states
-
-### Conditional Rendering
-
-Standard Blade directives:
+Blade — Laravel's templating engine — provides:
 
 ```blade
-@if($count > 0)
-    <p>Count is positive</p>
-@elseif($count < 0)
-    <p>Count is negative</p>
-@else
-    <p>Count is zero</p>
+{{-- Escaped output (XSS-safe) --}}
+<h1>{{ $title }}</h1>
+
+{{-- Raw HTML (use cautiously) --}}
+{!! $htmlContent !!}
+
+{{-- Control structures --}}
+@if($published)
+    <span class="badge">Live</span>
 @endif
 
-@unless($hidden)
-    <p>Visible unless hidden</p>
-@endunless
-```
-
-### List Rendering
-
-```blade
-@foreach($users as $user)
-    <div wire:key="user-{{ $user->id }}">
-        {{ $user->name }}
-    </div>
+@foreach($posts as $post)
+    <div wire:key="post-{{ $post->id }}">{{ $post->title }}</div>
 @endforeach
 
-@forelse($posts as $post)
-    <li>{{ $post->title }}</li>
-@empty
-    <li>No posts found</li>
-@endforelse
+{{-- Component composition --}}
+<x-alert :message="$errorMessage" />
+<livewire:post-editor :post="$post" />
 ```
-
-**Important**: Use `wire:key` for list items to help Livewire track elements during updates.
 
 ### Component Model
 
-**Three levels of composition**:
+v4 offers four component formats:
 
-**1. Blade Components** (stateless):
-```blade
-<!-- resources/views/components/alert.blade.php -->
-<div class="alert">{{ $message }}</div>
+**Single-file (default in v4)** — PHP class and Blade template in one `.blade.php` file:
 
-<!-- Usage: -->
-<x-alert :message="$errorMessage" />
-```
-
-**2. Livewire Components** (stateful):
 ```php
-// app/Livewire/CreatePost.php
-class CreatePost extends Component
-{
-    public $title = '';
+<?php
+use Livewire\Component;
 
-    public function save()
+new class extends Component {
+    public string $title = '';
+
+    public function save(): void
     {
         Post::create(['title' => $this->title]);
+        $this->redirect('/posts');
     }
+};
+?>
 
-    public function render()
-    {
-        return view('livewire.create-post');
-    }
-}
-
-// Usage in Blade:
-<livewire:create-post />
-```
-
-**3. Nested Livewire Components**:
-```blade
-<!-- Parent -->
 <div>
-    @foreach($posts as $post)
-        <livewire:post-item :post="$post" :key="$post->id" />
-    @endforeach
+    <input wire:model="title" type="text">
+    <button wire:click="save">Save</button>
 </div>
 ```
 
-**Passing data to children**:
-```blade
-<livewire:user-profile :userId="$userId" />
-<livewire:user-profile :$user /> <!-- PHP 8.0+ named argument shorthand -->
-```
+**Class-based (v3-compatible)** — separate PHP file (`app/Livewire/CreatePost.php`) + Blade view (`resources/views/livewire/create-post.blade.php`).
 
-Child receives via `mount()` or matching properties:
-```php
-class UserProfile extends Component
-{
-    public $userId;
+**Multi-file** — same as class-based but organized in a directory (`app/Livewire/CreatePost/class.php`, `view.blade.php`, `test.php`, `styles.css`, `script.js`).
 
-    public function mount($userId)
-    {
-        $this->userId = $userId;
-    }
-}
-```
+**Volt (via `livewire/volt`)** — an older single-file format that predates v4's built-in single-file support; class-based and functional API variants. Largely superseded by v4's native single-file support, but remains available.
+
+v4's choice to add a fourth format alongside three existing ones was explicitly acknowledged by Livewire's creator as a fragmentation problem — and is addressed directly in the convention-strength evidence below.
+
+---
 
 ## Event Handling
 
-### Core Primitives
+### Philosophy & Approach
 
-Use `wire:*` directives for event binding:
+Events in Livewire are primarily `wire:*` HTML directive bindings that invoke named PHP methods. The browser event fires → Livewire JS captures it → AJAX round-trip → PHP method executes → diff returned. This means event handlers are always PHP methods — no client-side event logic by default.
+
+For client-side-only behavior, Alpine.js is bundled and the `$wire` bridge allows Alpine to call PHP methods directly.
+
+### Event Binding
 
 ```blade
-<!-- Click events -->
+{{-- Click --}}
 <button wire:click="save">Save</button>
-<button wire:click="delete({{ $postId }})">Delete</button>
+<button wire:click="delete({{ $post->id }})">Delete</button>
 
-<!-- Form events -->
+{{-- Form --}}
 <form wire:submit="save">
-    <input type="text" wire:model="title">
-    <button type="submit">Submit</button>
+    <input wire:model="title" type="text">
+    <button type="submit">Save Post</button>
 </form>
 
-<!-- Input events -->
-<input wire:keydown.enter="search">
-<input wire:blur="validate">
+{{-- Keyboard --}}
+<input wire:keydown.enter="search" type="text">
+<input wire:keydown.escape="cancel" type="text">
 
-<!-- Custom events -->
-<div wire:custom-event="handleCustom">
+{{-- Other input events --}}
+<input wire:model.live="search" type="text">  {{-- real-time bind --}}
+<input wire:blur="validate" type="email">
 ```
-
-### Event Handlers
-
-Define methods in the component class:
-
-```php
-class CreatePost extends Component
-{
-    public $title = '';
-
-    public function save()
-    {
-        $this->validate(['title' => 'required|min:3']);
-
-        Post::create(['title' => $this->title]);
-
-        session()->flash('message', 'Post created!');
-
-        return redirect()->to('/posts');
-    }
-
-    public function delete($postId)
-    {
-        Post::findOrFail($postId)->delete();
-    }
-}
-```
-
-Methods can:
-- Access component properties via `$this`
-- Accept parameters from templates
-- Return redirects or render responses
-- Dispatch browser events
-- Emit events to other components
 
 ### Event Modifiers
 
-**Prevent default**:
 ```blade
 <a href="/logout" wire:click.prevent="logout">Logout</a>
-```
-
-**Stop propagation**:
-```blade
-<div wire:click="outer">
-    <button wire:click.stop="inner">Click</button>
-</div>
-```
-
-**Key modifiers**:
-```blade
-<input wire:keydown.enter="search">
-<input wire:keydown.escape="cancel">
-```
-
-**Debouncing**:
-```blade
-<input wire:model.live.debounce.500ms="search">
-```
-
-**Throttling**:
-```blade
+<div wire:click="outer"><button wire:click.stop="inner">Click</button></div>
 <button wire:click.throttle.1s="save">Save</button>
+<button wire:click.async="logEvent">Log (parallel, no re-render)</button>
+<button wire:click.renderless="trackClick">Track (no re-render)</button>
 ```
 
-### Two-Way Data Binding
-
-The `wire:model` directive:
+### Magic Actions (Client-Side Shortcuts)
 
 ```blade
-<input type="text" wire:model="title">
-<textarea wire:model="content"></textarea>
-<select wire:model="status">
-    <option value="draft">Draft</option>
-    <option value="published">Published</option>
-</select>
-```
-
-**Modifiers**:
-- `wire:model.live` - Update on every keystroke (150ms debounce)
-- `wire:model.blur` - Update when input loses focus
-- `wire:model.change` - Update on change event
-- `wire:model.debounce.500ms` - Custom debounce timing
-
-**Default behavior**: Without `.live`, Livewire only syncs the property when an action occurs (`wire:click`, `wire:submit`). This reduces unnecessary server requests.
-
-### Client-Side JavaScript Integration
-
-**Alpine.js integration** (included with Livewire):
-
-```blade
-<div x-data="{ open: false }">
-    <button @click="open = !open">Toggle</button>
-    <div x-show="open">Content</div>
-</div>
-```
-
-**Accessing Livewire from JavaScript**:
-
-```blade
-<div x-data="{ count: $wire.count }">
-    <button @click="$wire.increment()">Increment</button>
-    <span x-text="count"></span>
-</div>
-```
-
-The magic `$wire` object provides:
-- `$wire.property` - Access/modify properties
-- `$wire.method()` - Call component methods
-- `$wire.$refresh()` - Force re-render
-
-**Custom JavaScript hooks**:
-
-```javascript
-Livewire.hook('message.sent', (message, component) => {
-    console.log('Message sent:', message);
-});
-
-Livewire.hook('message.received', (message, component) => {
-    console.log('Response received:', message);
-});
-```
-
-## Reuse Patterns
-
-### Blade Components (Stateless)
-
-For simple, reusable UI elements:
-
-```blade
-<!-- resources/views/components/button.blade.php -->
-<button {{ $attributes->merge(['class' => 'btn']) }}>
-    {{ $slot }}
-</button>
-
-<!-- Usage: -->
-<x-button wire:click="save">Save</x-button>
-<x-button class="btn-primary" wire:click="delete">Delete</x-button>
-```
-
-### Livewire Components (Stateful)
-
-For interactive, self-contained features:
-
-```php
-// app/Livewire/SearchUsers.php
-class SearchUsers extends Component
-{
-    public $query = '';
-
-    public function render()
-    {
-        return view('livewire.search-users', [
-            'users' => User::where('name', 'like', "%{$this->query}%")->get()
-        ]);
-    }
-}
-
-// Usage:
-<livewire:search-users />
-```
-
-### Traits for Shared Behavior
-
-Extract common functionality:
-
-```php
-trait WithSorting
-{
-    public $sortField = 'created_at';
-    public $sortDirection = 'desc';
-
-    public function sortBy($field)
-    {
-        if ($this->sortField === $field) {
-            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-            $this->sortField = $field;
-            $this->sortDirection = 'asc';
-        }
-    }
-}
-
-class UserTable extends Component
-{
-    use WithSorting;
-
-    public function render()
-    {
-        return view('livewire.user-table', [
-            'users' => User::orderBy($this->sortField, $this->sortDirection)->get()
-        ]);
-    }
-}
+<button wire:click="$refresh">Refresh</button>
+<button wire:click="$toggle('open')">Toggle</button>
+<button wire:click="$set('count', 0)">Reset</button>
+<button wire:click="$dispatch('post-created')">Dispatch</button>
 ```
 
 ### Component Communication
 
-**Parent → Child** (props):
-```blade
-<livewire:post-item :post="$post" />
-```
-
-**Child → Parent** (events):
+**PHP dispatch (server-side)**:
 ```php
-// Child
+// Child dispatches an event
 $this->dispatch('post-updated', postId: $this->post->id);
 
-// Parent
-public function getListeners()
+// Another component listens via attribute
+#[On('post-updated')]
+public function handlePostUpdated(int $postId): void
 {
-    return ['post-updated' => 'refreshPost'];
-}
-
-public function refreshPost($postId)
-{
-    // Handle the event
+    $this->loadPost($postId);
 }
 ```
 
-**Global events** (broadcast to all components):
+**Targeted dispatch**:
 ```php
-$this->dispatch('user-logged-in')->to(Navbar::class);
-$this->dispatch('cart-updated')->self(); // Only to current component
+$this->dispatch('cart-updated')->to(Navbar::class);
+$this->dispatch('refresh')->self(); // Only the current component
 ```
 
-### Form Objects (Reusable State)
-
-Laravel Form Objects pattern:
-
-```php
-use Livewire\Form;
-
-class PostForm extends Form
-{
-    public $title = '';
-    public $content = '';
-
-    public function rules()
-    {
-        return [
-            'title' => 'required|min:3',
-            'content' => 'required|min:10',
-        ];
-    }
-
-    public function save()
-    {
-        $this->validate();
-        Post::create($this->all());
-    }
-}
-
-// Usage in component:
-class CreatePost extends Component
-{
-    public PostForm $form;
-
-    public function save()
-    {
-        $this->form->save();
-    }
-}
-```
-
-## Developer Experience
-
-### Learning Curve
-
-**Initial**: Low for Laravel developers. If you know Blade and basic Laravel, you can be productive immediately. The `wire:model` and `wire:click` directives are intuitive.
-
-**For non-Laravel devs**: Medium. Requires learning PHP, Laravel conventions, Composer, and the Laravel ecosystem.
-
-**Mental Model Shift**: Server-side components feel familiar to backend developers but different for those coming from React/Vue.
-
-### Tooling
-
-- **Artisan CLI**: `php artisan make:livewire Counter` scaffolds components
-- **Browser DevTools**: Livewire panel shows component updates, network requests
-- **Testing**: `Livewire\Testing` provides fluent test API:
-  ```php
-  Livewire::test(Counter::class)
-      ->assertSee('0')
-      ->call('increment')
-      ->assertSee('1');
-  ```
-- **IDE Support**: PHPStorm, VS Code with PHP extensions
-- **Debugging**: Laravel Telescope, Debugbar, dd() helper
-
-### Boilerplate
-
-Minimal. A complete interactive component:
-
-```php
-// app/Livewire/Counter.php
-<?php
-namespace App\Livewire;
-use Livewire\Component;
-
-class Counter extends Component
-{
-    public $count = 0;
-
-    public function increment() { $this->count++; }
-    public function decrement() { $this->count--; }
-
-    public function render()
-    {
-        return view('livewire.counter');
-    }
-}
-```
+### Alpine.js + $wire Bridge
 
 ```blade
-<!-- resources/views/livewire/counter.blade.php -->
-<div>
-    <h1>{{ $count }}</h1>
-    <button wire:click="increment">+</button>
-    <button wire:click="decrement">-</button>
+<div x-data="{ open: false }">
+    <button @click="open = !open">Toggle</button>
+    <div x-show="open">
+        {{-- Call Livewire method from Alpine --}}
+        <button @click="$wire.save()">Save</button>
+        <span x-text="$wire.count"></span>
+    </div>
 </div>
 ```
 
-That's ~20 lines total for a fully interactive component.
+---
 
-### Common Patterns
+## Rubric Evidence
 
-**Real-time validation**:
+### Evidence: Type-system integration
+
+**Categorical: community-types (via PHPStan + larastan-livewire extension)**
+
+PHP itself has a native type system (type hints, return types, enums, property types since PHP 7.4/8.0). Livewire's public properties do not enforce PHP type hints at the framework level — unsupported property types cause runtime serialization errors, not type errors at declaration time. The framework documentation notes: "PHP type hints are not enforced by Livewire itself." PHPStan provides static analysis via the `calebdw/larastan-livewire` extension (v2.5.0, March 2026, 643k downloads).
+
+**Sample type error** — deliberate mistake: calling a non-existent method on a component:
+
 ```php
-public function updated($propertyName)
+class Counter extends Component
 {
-    $this->validateOnly($propertyName);
-}
-```
+    public int $count = 0;
 
-**Confirmation modals**:
-```blade
-<button wire:click="delete" wire:confirm="Are you sure?">Delete</button>
-```
-
-**File uploads**:
-```php
-use Livewire\WithFileUploads;
-
-class UploadPhoto extends Component
-{
-    use WithFileUploads;
-
-    public $photo;
-
-    public function save()
+    public function increment(): void
     {
-        $this->validate(['photo' => 'image|max:1024']);
-        $this->photo->store('photos');
+        $this->nonExistentHelper(); // PHPStan error
     }
 }
 ```
 
-**Pagination**:
-```php
-use Livewire\WithPagination;
+PHPStan output (level 5):
+```
+ ------ ---------------------------------------------------
+  Line   app/Livewire/Counter.php
+ ------ ---------------------------------------------------
+  9      Call to an undefined method App\Livewire\Counter::nonExistentHelper().
+ ------ ---------------------------------------------------
+```
 
-class ShowPosts extends Component
+Without PHPStan, this is a silent runtime exception. The larastan-livewire extension additionally resolves `#[Computed]` property inference and flags incorrect Livewire test assertion calls (the common `::test()` chain false-positive). Livewire v4's single-file anonymous class components expose an additional gap: PHPStan v2 cannot fully analyze the inline `new class extends Component {}` syntax in `.blade.php` files per GitHub discussion #9826 — this part of the codebase falls outside static analysis coverage.
+
+**Score rationale: 5.5** — PHP has a real type system and PHPStan is well-adopted in the Laravel ecosystem, but the framework itself doesn't enforce types on the most critical surface (public property hydration/dehydration), the larastan extension is community-maintained not first-party, and v4 single-file components have a static analysis blind spot.
+
+### Evidence: Compiler/build feedback quality
+
+Livewire has no build compiler — it is PHP interpreted at request time. Errors surface in one of three ways:
+
+1. **PHP parse errors** — caught before execution, immediately actionable
+2. **PHP runtime exceptions** — detailed Laravel Ignition error pages in development with stack trace, source context, and suggested solutions
+3. **Livewire hydration errors** — custom exception classes with component context
+
+**Deliberately broken example: wrong event attribute name**
+
+```php
+class Counter extends Component
 {
-    use WithPagination;
+    public int $count = 0;
+
+    // Wrong: using #[Listen] instead of #[On]
+    #[Listen('post-updated')]
+    public function handleUpdate(): void
+    {
+        $this->count++;
+    }
+}
+```
+
+This produces no error at all — PHP happily accepts unknown attributes and ignores them. The event handler is silently never registered. No runtime error, no build warning, no static analysis warning by default. This is the most dangerous error class in Livewire: **silent wrong behavior from a typo in an attribute name**.
+
+**Deliberately broken example: missing view**
+
+```php
+public function render()
+{
+    return view('livewire.nonexistent');
+}
+```
+
+Runtime error (with Ignition):
+```
+Illuminate\View\Exception\InvalidArgumentException
+View [livewire.nonexistent] not found.
+
+at vendor/laravel/framework/src/Illuminate/View/FileViewFinder.php:137
+```
+
+Ignition adds the file paths searched, which is actionable. But it fires at request time, not at definition time.
+
+**Score rationale: 6.0** — Laravel Ignition's development error pages are genuinely good: source context, stack traces, suggested solutions. The real deduction is the PHP-as-runtime gap: no compile step means no pre-flight check. The most dangerous errors (typo'd attribute names, unknown method calls without PHPStan) are silent at the point of definition. PHPStan compensates significantly but is opt-in. The feedback loop is "request → error page" rather than "save → editor diagnostic".
+
+### Evidence: Locality of behavior
+
+**Feature traced: live search field that filters a list and shows a loading spinner**
+
+Files touched to understand and change this feature end-to-end:
+
+| # | File / Concept | What it holds |
+|---|---|---|
+| 1 | `app/Livewire/SearchPosts.php` | PHP class: `$query` property, `render()` method with DB query |
+| 2 | `resources/views/livewire/search-posts.blade.php` | Template: `wire:model.live="query"`, `wire:loading`, `@foreach` loop |
+
+Total: **2 touchpoints**.
+
+If using v4 single-file format, this collapses to **1 file**:
+
+```php
+{{-- resources/views/livewire/search-posts.blade.php --}}
+<?php
+use Livewire\Component;
+use App\Models\Post;
+
+new class extends Component {
+    public string $query = '';
 
     public function render()
     {
-        return view('livewire.show-posts', [
-            'posts' => Post::paginate(10)
+        return view('livewire.search-posts', [
+            'posts' => Post::where('title', 'like', "%{$this->query}%")->get(),
         ]);
     }
-}
+};
+?>
+
+<div>
+    <input wire:model.live.debounce.300ms="query" type="text" placeholder="Search...">
+    <div wire:loading>Searching...</div>
+    @foreach ($posts as $post)
+        <div wire:key="post-{{ $post->id }}">{{ $post->title }}</div>
+    @endforeach
+</div>
 ```
 
-### Documentation
+For comparison, understanding a React equivalent with TanStack Query would touch: the component file, a custom hook or query function, possibly a context provider, and TanStack Query's configuration.
 
-Excellent. Comprehensive docs at livewire.laravel.com:
-- Getting started guide
-- Feature-specific documentation
-- Cookbook with common patterns
-- Screencasts and tutorials
-- Active community forum
+**No documentation friction** locating this pattern — the Livewire v4 quickstart leads directly to the two-touchpoint or single-file model.
 
-### Component Reusability Assessment
+**Score rationale: 8.0** — Locality is Livewire's strongest dimension. State, rendering, and event handling for a feature co-locate in one or two files. The Blade template directly references class properties by name without an import or binding layer. The only structural cost is the required `render()` method in the class-based format, and even that collapses in v4 single-file components.
 
-**Quality: Good (7.5/10)**
+### Evidence: Explicitness / data-flow traceability
 
-Laravel Livewire provides **two primary reuse mechanisms**:
+**State change traced: user types in a search input, filtered list re-renders**
 
-1. **Blade Components** (stateless) - Standard Laravel components for UI elements
-2. **Livewire Components** (stateful) - Full interactive components with lifecycle
+| Step | Hop | Type |
+|---|---|---|
+| 1 | User types in `<input wire:model.live="query">` | Explicit — directive names the property |
+| 2 | Livewire JS debounces and sends AJAX POST to `/livewire-{hash}/update` | Implicit — framework intercepts the input event |
+| 3 | Server: `$this->query` is updated from the POST payload | Explicit — direct property assignment (visible in framework source, documented) |
+| 4 | `render()` is called; `Post::where(..., $this->query)` returns filtered results | Explicit — the render method is readable PHP |
+| 5 | Blade template re-renders with the new `$posts` collection | Explicit — standard Blade `@foreach` |
+| 6 | Livewire diffs old vs new HTML, sends patch | Implicit — morphdom patching is framework magic |
+| 7 | Browser DOM is updated | Implicit — framework applies the patch |
 
-**Strengths**:
-- **Slot-based composition** - Named slots and default slots work well
-- **Traits for shared behavior** - `WithPagination`, `WithFileUploads`, custom traits
-- **Form Objects** - Reusable validation and state management via `Livewire\Form`
-- **Packagable** - Components can be distributed via Composer packages
-- **Laravel conventions** - Follows existing Laravel patterns, familiar to ecosystem
+Explicit hops: 4 / Total hops: 7. The implicit hops (AJAX interception, morphdom patching) are framework infrastructure and well-documented. The **binding between template directive and class property is by name string** — `wire:model="query"` references `$query` by string, not by type or reference. A typo in the directive name is silent (wrong property update, no error).
 
-**Weaknesses**:
-- **Non-reactive by default** - Child components don't auto-update when parent props change without `#[Reactive]` attribute. This breaks composition expectations from React/Vue
-- **Less granular** - No built-in concept of "headless components" or render props
-- **Two-template system** - Blade components (.blade.php) separate from Livewire components (class + template)
-- **Limited cross-framework** - Tied to Laravel/PHP ecosystem, can't use in Node.js projects
+Compared to Phoenix LiveView's socket assigns model, which uses `handle_event/3` for each event type and `assign/3` to update state with explicit function clauses, Livewire is slightly less explicit at the event-dispatch-to-property link (string binding vs. pattern-matched function heads). Compared to React, Livewire is more explicit — there is no `useEffect` dependency array magic, no reconciler batching to reason about, and no stale closure problem.
 
-**Design System Support**: Moderate. Blade components work well for design systems, but the dual-component model (Blade vs Livewire) adds complexity. Anonymous components help:
+**Score rationale: 8.5** — The data flow is unusually traceable: directive → named method → property mutation → render. The implicit infrastructure (AJAX, morphdom) is unavoidable for a server-rendered framework and well-documented. The main traceability gap is string-keyed directive names (both `wire:click="save"` and `wire:model="query"` reference PHP method/property names as strings, so a typo is not caught statically without PHPStan).
 
-```blade
-<!-- resources/views/components/button.blade.php -->
-@props(['variant' => 'primary', 'size' => 'md'])
+### Evidence: Convention strength
 
-<button {{ $attributes->merge(['class' => "btn btn-{$variant} btn-{$size}"]) }}>
-    {{ $slot }}
-</button>
-```
+**Task: "fetch data when the component loads"**
 
-**Cross-Project Reuse**: Good within Laravel ecosystem via Composer packages, but non-reactive default limits true component isolation.
+Searched the official v4 docs and ecosystem for alternative approaches:
 
-## Maintainability
+| Approach | Source | Notes |
+|---|---|---|
+| `render()` with inline DB query | Official docs — quickstart | Most idiomatic; no separate lifecycle hook needed |
+| `mount()` lifecycle hook | Official docs — lifecycle hooks | Initializes properties; preferred when data depends on mount arguments |
+| `#[Computed]` method | Official docs — computed properties | Lazy; only runs when `$this->propertyName` is accessed in template |
+| `wire:init="loadData"` | Official docs — deferred loading | Fires after initial page render; used for progressive loading |
+| `boot()` hook | Official docs — lifecycle hooks | Runs before every request; less common for data loading |
 
-**Quality: Good (7.5/10)**
+Count: **5 idiomatic-looking approaches** to data loading.
 
-**Refactoring**:
-- **Type hints** (PHP 8+) provide safety when refactoring method signatures
-- **Static analysis** via PHPStan/Psalm catches errors before runtime
-- **Convention-based file locations** - easy to find related files
-- **Laravel's migration system** - database changes are versioned and reversible
+**The component format proliferation problem** is a more significant convention fragmentation: v4 ships with four distinct component formats (class-based, single-file, multi-file, Volt), each documented and officially supported. The creator's Laracon 2025 talk explicitly framed this as a problem Livewire 4 was meant to solve ("completely and totally forked into three different ways"), then resolved it by adding a fourth canonical format. The upgrade guide identifies the now-preferred path (single-file by default), but the ecosystem carries all four patterns in tutorials, packages, and existing codebases.
 
-**Debugging**:
-- **Laravel Telescope** - Comprehensive monitoring dashboard (requests, queries, events, logs)
-- **Laravel Debugbar** - In-browser profiling and query analysis
-- **`dd()` and `dump()`** - Convenient debugging helpers
-- **Browser DevTools** - Livewire panel shows component updates and network activity
-- **Verbose error pages** - Laravel's Ignition provides detailed error context
+Documentation friction note: identifying which of the five data-loading patterns is most idiomatic in v4 required cross-referencing the quickstart, the properties docs, the computed properties docs, and the lifecycle hooks docs. The docs are individually excellent but do not prominently signal "prefer this over that" ordering across patterns. The quickstart uses `render()` with an inline query — which is correct for simple cases — but the computed properties docs present `#[Computed]` as the idiomatic pattern for database queries without cross-referencing the quickstart pattern.
 
-**Code Organization**:
-- **Single-file components** - Each Livewire component is one class
-- **Separation of concerns** - Models, services, components stay separate
-- **Artisan generators** - `make:livewire` scaffolds consistent structure
-- **Resource organization** - Views, components, layouts have clear conventions
+**Score rationale: 7.5** — Core conventions (public properties = state, `wire:click` = event, `render()` = view, `#[On]` = listener) are extremely stable and few. The penalty comes from the component format proliferation (four formats, all officially valid) and the five distinct data-loading patterns with no clear "prefer this one" signal across the docs.
 
-**Testing**:
-- **Fluent test API** - `Livewire::test()` provides readable assertions
-- **PHPUnit integration** - Standard Laravel testing tools work
-- **Browser testing** - Laravel Dusk for end-to-end tests
-- **Fast** - No browser needed for Livewire component tests
+### Evidence: Token efficiency / boilerplate density
 
-**Scalability**:
-- **Stateless by default** - AJAX requests don't maintain persistent connections (unlike WebSockets)
-- **Caching strategies** - Request-level, component-level, application-level caching
-- **Lazy loading** - Load components on-demand with `wire:init`
-- **Queueable operations** - Offload heavy tasks to Laravel queues
-- **Horizontal scaling** - Standard PHP-FPM scaling, no persistent state per connection
+**No canonical Livewire entry on todomvc.com.** Falling back to: community TodoMVC-style implementation ([YannickYayo/livewire-todolist](https://github.com/YannickYayo/livewire-todolist), Livewire 1.x) plus a fresh v4 implementation following the official v4 quickstart idioms (single-file format, `#[Computed]`, `#[On]`).
 
-**Breaking Changes**:
-- **Semantic versioning** - Laravel and Livewire follow SemVer
-- **Upgrade guides** - Clear migration paths between major versions
-- **Deprecation warnings** - Features marked deprecated before removal
-- **Community packages** - May break between Laravel versions
+**v4 Todo implementation (single-file format)**:
 
-**Weaknesses**:
-- **Non-reactive default creates bugs** - Easy to forget `#[Reactive]`, leading to stale child data
-- **Template/logic split** - Blade template separate from PHP class requires two file edits
-- **Magic methods** - Some Livewire behaviors (lifecycle hooks, property hydration) use PHP magic methods that are harder to trace
-- **Implicit serialization** - Public properties auto-serialize, which can cause issues with complex objects
-- **PHP talent pool** - Smaller than JavaScript ecosystem
-
-**Particularly Maintainable Aspects**:
-- Laravel conventions provide consistency across teams
-- Artisan commands standardize component creation
-- Testing is first-class with no browser required
-- Static analysis catches many errors
-
-**Maintenance Challenges**:
-- `#[Reactive]` attribute requirement is easy to miss, causing subtle bugs
-- Understanding what gets serialized between requests requires mental model
-- Blade template syntax has edge cases (escaping, directives)
-
-## AI-Friendly Assessment
-
-**Overall Score: 8/10**
-
-### Strengths for AI-Assisted Development
-
-**Laravel Convention Over Configuration**: Livewire follows Laravel's conventions strictly. File locations, naming patterns, and method signatures are predictable. AI can reliably generate code that matches the framework's expectations.
-
-**Explicit Event Bindings**: `wire:click="save"` is scannable and greppable. AI can trace event handlers by searching for method names in the component class. No need to track complex callback chains.
-
-**Single-File Components**: Each Livewire component is a single PHP class with all its state, methods, and lifecycle hooks. AI doesn't need to track state across multiple files.
-
-**Strong Typing Potential**: PHP 8+ type declarations make properties and methods self-documenting:
 ```php
-public int $count = 0;
-public function setUser(User $user): void { ... }
+{{-- resources/views/livewire/todos.blade.php --}}
+<?php
+use Livewire\Component;
+use Livewire\Attributes\Computed;
+use App\Models\Todo;
+
+new class extends Component {
+    public string $newTodo = '';
+    public string $filter = 'all';  // 'all' | 'active' | 'completed'
+
+    public function addTodo(): void
+    {
+        $this->validate(['newTodo' => 'required|min:2']);
+        Todo::create(['title' => trim($this->newTodo), 'completed' => false]);
+        $this->newTodo = '';
+        unset($this->todos);
+    }
+
+    public function toggleTodo(int $id): void
+    {
+        $todo = Todo::findOrFail($id);
+        $todo->update(['completed' => !$todo->completed]);
+        unset($this->todos);
+    }
+
+    public function deleteTodo(int $id): void
+    {
+        Todo::destroy($id);
+        unset($this->todos);
+    }
+
+    #[Computed]
+    public function todos()
+    {
+        return match($this->filter) {
+            'active'    => Todo::where('completed', false)->get(),
+            'completed' => Todo::where('completed', true)->get(),
+            default     => Todo::all(),
+        };
+    }
+
+    public function render() { return view('livewire.todos'); }
+};
+?>
+
+<div>
+    <form wire:submit="addTodo">
+        <input wire:model="newTodo" type="text" placeholder="What needs doing?">
+        <button type="submit">Add</button>
+    </form>
+
+    <ul>
+        @foreach($this->todos as $todo)
+            <li wire:key="todo-{{ $todo->id }}">
+                <input type="checkbox" wire:click="toggleTodo({{ $todo->id }})"
+                    {{ $todo->completed ? 'checked' : '' }}>
+                <span>{{ $todo->title }}</span>
+                <button wire:click="deleteTodo({{ $todo->id }})">×</button>
+            </li>
+        @endforeach
+    </ul>
+
+    <div>
+        <button wire:click="$set('filter', 'all')">All</button>
+        <button wire:click="$set('filter', 'active')">Active</button>
+        <button wire:click="$set('filter', 'completed')">Completed</button>
+    </div>
+</div>
 ```
 
-**Mutable State**: Direct property mutations (`$this->count++`) are straightforward to understand and generate. No complex immutable update patterns.
+**Line count: ~57 lines** for the complete Todo feature (add, toggle, delete, filter). This is a single file covering the full feature.
 
-**Built-in Patterns**: Traits like `WithPagination`, `WithFileUploads` provide standardized solutions. AI learns these patterns once and applies them consistently.
+For comparison, the Phoenix LiveView equivalent is approximately 60-65 lines in a single LiveView file. The React TodoMVC canonical reference (tastejs/todomvc) is ~110 lines across multiple files (component + reducer + types).
 
-**Clear Data Flow**: Properties → Template → Events → Methods → Properties. The cycle is explicit and traceable.
+The Livewire implementation does require a Laravel `Todo` model and a migration to exist separately — this is Laravel's standard ORM layer, not Livewire-specific boilerplate. The component itself contains zero boilerplate scaffolding beyond the `render()` return statement.
 
-**Testing API**: The fluent test syntax is highly readable:
-```php
-Livewire::test(Counter::class)
-    ->set('count', 5)
-    ->call('increment')
-    ->assertSet('count', 6);
-```
+**Score rationale: 7.5** — Competitive token density, particularly for a full-stack feature that includes persistence. The single-file v4 format eliminates the class/view split. Loses points versus pure-client frameworks because real Livewire features typically involve a model migration and factory as additional files — that's an unavoidable cost of the server-side PHP approach, not a Livewire design choice.
 
-### Weaknesses for AI-Assisted Development
+### Evidence: Familiarity composite
 
-**Non-Reactive Default**: Child components don't automatically update when parent props change. AI must remember to add `#[Reactive]` when needed. This is a common gotcha.
+**GitHub stars**: 23,528 (Packagist, June 2026)
+**Packagist total installs**: 85,612,285 (June 2026)
+**Packagist dependents**: 2,190
+**First released**: 2019 (7 years)
+**Status**: Active, maintained by original creator
 
-**Magic `$wire` Object**: While powerful, `$wire` introduces implicit behavior in JavaScript that's harder to trace than explicit method calls.
+**Stack Overflow**: stackoverflow.com/questions/tagged/livewire was inaccessible for direct scraping. Proxy: the `laravel-livewire` tag exists and is actively used; the Laravel ecosystem overall has ~500k SO questions and Livewire is the dominant Laravel UI layer. Community volume is high within the Laravel ecosystem but the framework is Laravel-specific — there is no cross-ecosystem usage.
 
-**Blade Syntax Quirks**: The `@if/@foreach` directives and `{{ }}` vs `{!! !!}` escaping require PHP-specific knowledge. Mixed HTML/PHP syntax can be harder to parse than pure templating languages.
+**Registry trend**: Packagist installs are strongly upward (v3 shipped 2023, v4 shipped January 2026). The PHP/Laravel space is large but smaller than the JavaScript ecosystem — npm download volumes for comparable JS tools (Alpine.js: 1M+/week, HTMX: 300k+/week) are structurally higher.
 
-**Computed Property Prefix**: Requiring `$this->` for computed properties in templates but not for regular properties is inconsistent:
-```blade
-{{ $count }}           <!-- Regular property -->
-{{ $this->total }}     <!-- Computed property -->
-```
+**Ecosystem signal**: Livewire is the default UI layer in Laravel starter kits (replacing Jetstream's Vue/React options as the "pure PHP" path). Filament — the most popular Laravel admin panel (3k+ dependents) — is built on Livewire. This produces strong downstream adoption pressure.
 
-**Caching Complexity**: Multiple caching levels (request, persist, application-wide) and manual cache busting (`unset()`) add cognitive overhead.
+**Familiarity for LLM pretraining**: Livewire has been training data since 2019 but the ecosystem is PHP/Laravel-specific. v1/v2 code patterns significantly outnumber v3/v4 patterns in the pretraining corpus (similar to the Phoenix LiveView 0.x vs 1.0 gap). The v3→v4 idiom shift (event attributes, component formats, wire:model semantics) means the most common training examples may be outdated.
 
-**Request/Response Nature**: Unlike LiveView's persistent WebSocket, Livewire's AJAX model means component state is serialized/deserialized each request. This can lead to subtle bugs with complex objects.
+**Score rationale: 6.5** — Well-established within the Laravel ecosystem (7 years, 85M installs, dominant position). Loses points versus JavaScript-ecosystem tools: (a) PHP/Laravel-specific, so total community volume and pretraining corpus is smaller than React/Vue, (b) significant v3→v4 API changes mean pre-2026 training data demonstrates deprecated idioms, (c) not on npm so JS-focused agent toolchains don't encounter it.
 
-**PHP Learning Curve**: For AI trained primarily on JavaScript, PHP syntax and Laravel patterns require additional context.
+### Evidence: Stability / convention durability
 
-### Why 8/10?
+Checked: Packagist changelog, the official [upgrade guide](https://livewire.laravel.com/docs/upgrading), the [Laravel News announcement](https://laravel-news.com/livewire-4-is-dropping-next-week-and-wiretransition-makes-animations-effortless) (January 8, 2026), and the laravel.com blog post (August 18, 2025).
 
-Livewire scores highly because:
-- **Explicit, traceable data flow** - Events clearly map to methods
-- **Conventional patterns** - Laravel conventions make code predictable
-- **Mutable, straightforward state** - No complex immutable updates
-- **Strong testing story** - Easy to verify behavior
-- **Minimal API surface** - `wire:model`, `wire:click`, public properties, that's 80% of the framework
+**v3→v4 breaking changes (already shipped, stable)**:
+1. Routing: `Route::livewire()` now required for full-page components (was `Route::get()`)
+2. `wire:model`: no longer responds to events bubbling from child elements by default; add `.deep` to restore
+3. `wire:scroll` renamed to `wire:navigate:scroll`
+4. `wire:transition`: now uses browser's native View Transitions API instead of Alpine's `x-transition`; `.opacity` and `.scale` modifiers no longer work
+5. JavaScript hooks: `commit`/`request` deprecated in favor of `interceptMessage`/`interceptRequest`
+6. URL structure change: `/livewire/` → `/livewire-{hash}/`
+7. Config key renamed: `layout` → `component_layout`
 
-The 2-point deduction is for:
-- **Non-reactive default** - Easy to miss when children should be reactive
-- **PHP-specific knowledge** - Requires understanding Laravel ecosystem
-- **Template inconsistencies** - Computed properties needing `$this->`, Blade directive syntax
+These are **already stable in v4**. They do not constitute a current stability penalty — they are the current convention.
 
-For developers already in the Laravel ecosystem, Livewire is effectively a **9/10**. The conventions feel natural and the AI-friendliness is exceptional.
+**v4.x track (current)**: The 4.x point releases (latest: 4.3.1, June 2, 2026) are stability-focused: bug fixes to Islands, lazy loading, parallel test cache, computed properties. No announced breaking changes on the 4.x track.
+
+**No v5 roadmap or breaking-change RFCs** found as of this review date.
+
+**`next_release` assessment**: No new major release is announced or in progress. The `stability_penalty: false` flag reflects this — the current convention set is stable and the 4.x track is maintenance.
+
+**Score rationale: 6.5** — The v4 convention set is stable and well-documented. The penalty reflects: (a) the v3→v4 migration was significant (7 documented breaking changes, routing change, wire:model semantics change), which happened within ~2 years of v3; (b) the component format history (4 formats accumulated over the project's life) signals convention evolution speed faster than ideal; (c) the Volt package introduced a convention now being superseded by v4's native single-file format. The current state is stable, but the convention durability record over the project's lifetime is mixed.
+
+### Evidence: Ecosystem tooling facts
+
+**Devtools**
+- [x] **Browser devtools panel**: Livewire ships a browser devtools integration showing component updates, AJAX payloads, and network timing. Available in Chromium and Firefox.
+- [x] **Laravel Telescope**: First-party Laravel request monitoring — all Livewire AJAX requests are logged with their payload and response. ([laravel.com/docs/telescope](https://laravel.com/docs/telescope))
+- [x] **Laravel Debugbar**: In-browser query profiling and timeline. Shows per-request DB queries triggered by Livewire actions.
+
+**Test utilities**
+- [x] **Livewire test API**: Fluent test helper built into the package — no browser needed, no separate install. ([livewire.laravel.com/docs/testing](https://livewire.laravel.com/docs/testing))
+  ```php
+  Livewire::test(Counter::class)
+      ->set('count', 5)
+      ->call('increment')
+      ->assertSet('count', 6)
+      ->assertSee('6');
+  ```
+- [x] **PHPUnit integration**: Standard Laravel test runner; Livewire tests run as standard PHPUnit test cases.
+- [x] **Pest support**: The testing docs show Pest examples as the primary style.
+- [x] **Laravel Dusk**: Browser testing for Livewire via Chrome WebDriver. ([laravel.com/docs/dusk](https://laravel.com/docs/dusk))
+- [x] **Playwright integration**: Mentioned in v4 docs as a modern alternative to Dusk.
+
+**IDE / LSP support**
+- [x] **PhpStorm 2026.1**: Explicit Livewire support listed in 2026.1 release notes (IntelliJ plugin maintained by JetBrains). ([blog.jetbrains.com/phpstorm/2026/03](https://blog.jetbrains.com/phpstorm/2026/03/phpstorm-2026-1-is-now-out/))
+- [x] **VS Code (Laravel Extension v1.4.3)**: Livewire 4 support added — syntax highlighting, IntelliSense for `wire:*` directives. ([laravel-news.com/laravel-vscode-extension-v1-4-3](https://laravel-news.com/laravel-vscode-extension-v1-4-3))
+- [x] **PHPStan (larastan-livewire)**: Static analysis extension for Livewire v4, community-maintained. ([packagist.org/packages/calebdw/larastan-livewire](https://packagist.org/packages/calebdw/larastan-livewire))
+- [x] **Artisan scaffolding**: `php artisan make:livewire ComponentName` generates class + view with correct namespacing.
+
+**Score rationale: 7.5** — Solid tooling story within the PHP/Laravel ecosystem. The main deduction is that the IDE support is add-on (not built-in language server parity with TypeScript) and the PHPStan extension is community-maintained with a known blind spot for v4 single-file anonymous class components. No dedicated Livewire-specific browser devtools extension comparable to React DevTools or Vue DevTools — debugging goes through Laravel's general-purpose tools.
 
 ---
 
-**Key Insight for Next-Gen Framework Design**: Livewire demonstrates that **explicit event bindings** (`wire:click="methodName"`) are more AI-friendly than inline callbacks (`@click="() => setCount(count + 1)"`). Being able to grep for event names and find handlers immediately is valuable. Additionally, **mutable state with automatic tracking** (public properties) is simpler than immutable updates with manual dependency arrays. However, **reactivity should be opt-out, not opt-in**—the `#[Reactive]` requirement for parent-child updates is a common source of bugs.
+## On the Horizon
 
-## Context: Laravel's UI Ecosystem
+### Next release
+- **Name/version:** No v5 announced; active on the 4.x track
+- **Status:** null — no pre-release in progress
+- **What's changing:** v4.x maintenance track: Islands stability, lazy-loading improvements, Blaze compiler refinements, PHP 8.4 property hooks expansion. All additive.
+- **Anticipated impact:** No rubric score changes anticipated from the 4.x maintenance track. The v4 convention set is the stable target.
+- **Stability penalty:** no — v4 is current stable with no announced breaking changes on the 4.x track. The stability score reflects v3→v4 convention history, not a forward-looking risk.
 
-Livewire is one of three approaches to building UIs in Laravel:
-
-1. **Blade** (traditional): Server-rendered templates with full page reloads. No interactivity without custom JavaScript.
-
-2. **Livewire** (this review): Server-rendered components with AJAX-driven interactivity. Stay in PHP, minimal JavaScript.
-
-3. **Inertia.js**: Server-driven routing with client-side rendering. Use Vue/React/Svelte for the view layer, Laravel for routing/data. No API needed, but you write JavaScript components.
-
-Livewire is the sweet spot for Laravel developers who want SPA-like UX without leaving PHP.
+### AI-tooling investment
+- **What exists:**
+  - **Laravel Boost** ([github.com/laravel/boost](https://github.com/laravel/boost)) — official first-party AI tooling for the Laravel ecosystem. Ships a `livewire-development` skill automatically installed when `livewire/livewire` is in `composer.json`. Connects agents to the [Laravel documentation API](https://laravel.com/docs/12.x/boost#documentation-api) with 17,000+ indexed pieces of versioned ecosystem documentation including Livewire, filtered to the installed major version. Announced March 2026.
+  - **Laravel Skills directory** ([skills.laravel.cloud](https://skills.laravel.cloud/)) — community skill extensions, including Livewire-specific patterns.
+  - **No `llms.txt`** at livewire.laravel.com as of June 2026.
+  - **No dedicated Livewire MCP server** — Laravel MCP ([github.com/laravel/mcp](https://github.com/laravel/mcp)) is a server-building framework, not a Livewire-specific context server.
+- **Observed delta:** See `ai_tooling.observed_delta` in frontmatter. Summary: Laravel Boost's `livewire-development` skill corrected two v3→v4 idiom gaps (event attribute syntax, `wire:key` requirement) and one wire:model modifier use on first attempt. The delta is bounded — it closes the training-data freshness gap on v4 API changes rather than teaching structural framework concepts from scratch. The framework's explicit binding conventions (`wire:click="methodName"`, `wire:model="property"`) mean even baseline model output is largely correct in structure; the skill primarily fixes version-specific syntax differences.

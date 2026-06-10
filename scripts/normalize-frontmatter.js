@@ -89,9 +89,15 @@ files.forEach(file => {
     'docs_url',
     'implementation_language',
     'status',
-    'ai_friendliness_score',
-    'reusability_score',
-    'maintainability_score'
+    'type_system_score',
+    'compiler_feedback_score',
+    'locality_score',
+    'explicitness_score',
+    'convention_strength_score',
+    'token_efficiency_score',
+    'familiarity_score',
+    'stability_score',
+    'tooling_score'
   ];
 
   requiredFields.forEach(field => {
@@ -115,7 +121,7 @@ files.forEach(file => {
   });
 
   // Links & Resources
-  const linkFields = ['github_url', 'docs_url', 'npm_package', 'mcp_server'];
+  const linkFields = ['github_url', 'docs_url', 'npm_package', 'ai_tooling'];
   if (linkFields.some(f => f in frontmatter)) {
     linkFields.forEach(field => {
       if (field in frontmatter) orderedFrontmatter[field] = frontmatter[field];
@@ -152,7 +158,22 @@ files.forEach(file => {
   }
 
   // Scores
-  ['ai_friendliness_score', 'reusability_score', 'maintainability_score'].forEach(field => {
+  [
+    'type_system_score',
+    'compiler_feedback_score',
+    'locality_score',
+    'explicitness_score',
+    'convention_strength_score',
+    'token_efficiency_score',
+    'familiarity_score',
+    'stability_score',
+    'tooling_score'
+  ].forEach(field => {
+    if (field in frontmatter) orderedFrontmatter[field] = frontmatter[field];
+  });
+
+  // On the Horizon
+  ['next_release', 'components', 'supersedes', 'superseded_by'].forEach(field => {
     if (field in frontmatter) orderedFrontmatter[field] = frontmatter[field];
   });
 

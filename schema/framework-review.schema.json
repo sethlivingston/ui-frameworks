@@ -10,9 +10,15 @@
     "docs_url",
     "implementation_language",
     "status",
-    "ai_friendliness_score",
-    "reusability_score",
-    "maintainability_score"
+    "type_system_score",
+    "compiler_feedback_score",
+    "locality_score",
+    "explicitness_score",
+    "convention_strength_score",
+    "token_efficiency_score",
+    "familiarity_score",
+    "stability_score",
+    "tooling_score"
   ],
   "properties": {
     "name": {
@@ -61,26 +67,6 @@
       "type": ["string", "null"],
       "description": "NPM package name (if applicable)",
       "examples": ["react", "vue", "svelte", null]
-    },
-    "mcp_server": {
-      "type": ["object", "null"],
-      "description": "Model Context Protocol server information",
-      "properties": {
-        "available": {
-          "type": "boolean",
-          "description": "Whether an MCP server exists for this framework"
-        },
-        "url": {
-          "type": ["string", "null"],
-          "format": "uri",
-          "description": "MCP server URL or repository"
-        },
-        "party": {
-          "type": ["string", "null"],
-          "enum": ["first-party", "third-party", "community", null],
-          "description": "Who maintains the MCP server"
-        }
-      }
     },
     "implementation_language": {
       "type": "string",
@@ -170,23 +156,143 @@
       "description": "Current maintenance status",
       "enum": ["active", "maintenance", "deprecated", "archived", null]
     },
-    "ai_friendliness_score": {
+    "type_system_score": {
       "type": ["number", "null"],
-      "description": "AI-friendliness score (0-10)",
+      "description": "Type-system integration: how much the compiler/type-checker catches before runtime (0-10). Evidence: ### Evidence: Type-system integration",
       "minimum": 0,
       "maximum": 10
     },
-    "reusability_score": {
+    "compiler_feedback_score": {
       "type": ["number", "null"],
-      "description": "Component/state reusability score (0-10)",
+      "description": "Compiler/build feedback quality: how useful the error you get back actually is (0-10). Evidence: ### Evidence: Compiler/build feedback quality",
       "minimum": 0,
       "maximum": 10
     },
-    "maintainability_score": {
+    "locality_score": {
       "type": ["number", "null"],
-      "description": "Code maintainability score (0-10)",
+      "description": "Locality of behavior: how many files/concepts you must touch to understand or change one feature (0-10). Evidence: ### Evidence: Locality of behavior",
       "minimum": 0,
       "maximum": 10
+    },
+    "explicitness_score": {
+      "type": ["number", "null"],
+      "description": "Explicitness / data-flow traceability: how many magic steps sit between a trigger and what renders (0-10). Evidence: ### Evidence: Explicitness / data-flow traceability",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "convention_strength_score": {
+      "type": ["number", "null"],
+      "description": "Convention strength: how many valid ways exist to do the same common task (0-10). Evidence: ### Evidence: Convention strength",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "token_efficiency_score": {
+      "type": ["number", "null"],
+      "description": "Token efficiency / boilerplate density: how much code a small feature costs (0-10). Evidence: ### Evidence: Token efficiency / boilerplate density",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "familiarity_score": {
+      "type": ["number", "null"],
+      "description": "Familiarity composite: how much of this a model's pretraining likely covers, triangulated from age-weighted community volume, GitHub activity, registry trend, and first_released (0-10). Evidence: ### Evidence: Familiarity composite",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "stability_score": {
+      "type": ["number", "null"],
+      "description": "Stability / convention durability: whether how it's done today will still be true in 6 months, sourced from next_release tracking (0-10). Evidence: ### Evidence: Stability / convention durability",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "tooling_score": {
+      "type": ["number", "null"],
+      "description": "Ecosystem tooling facts: what verification-side infrastructure exists (devtools, test utilities, IDE/LSP support) (0-10). Evidence: ### Evidence: Ecosystem tooling facts",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "components": {
+      "type": ["array", "null"],
+      "description": "Present only on combo files — the technologies reviewed together as a pairing, lowercase identifiers (e.g. [\"lit\", \"preact\"]) so `rg \"components:.*lit\"` surfaces every file touching a technology, standalone or paired",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_release": {
+      "type": ["object", "null"],
+      "description": "Tracked, ranking-neutral info about an upcoming release. This is the evidence source the stability_score dimension's ### Evidence section should cite — one source of truth for 'this is mid-rewrite'",
+      "properties": {
+        "name": {
+          "type": ["string", "null"],
+          "description": "Name/version of the upcoming release"
+        },
+        "status": {
+          "type": ["string", "null"],
+          "enum": ["alpha", "beta", "rfc", "announced", null],
+          "description": "Maturity of the upcoming release"
+        },
+        "changes": {
+          "type": ["string", "null"],
+          "description": "What's changing"
+        },
+        "anticipated_impact": {
+          "type": ["string", "null"],
+          "description": "Expected impact of the changes"
+        },
+        "stability_penalty": {
+          "type": ["boolean", "null"],
+          "description": "Whether this upcoming release is significant enough to flag a stability penalty"
+        }
+      }
+    },
+    "ai_tooling": {
+      "type": ["object", "null"],
+      "description": "Tracked, ranking-neutral facts about AI-tooling investment for this framework — what exists and the observed delta from using it. Absorbs the prior standalone mcp_server field as a sub-field",
+      "properties": {
+        "mcp_server": {
+          "type": ["object", "null"],
+          "description": "Model Context Protocol server information",
+          "properties": {
+            "available": {
+              "type": "boolean",
+              "description": "Whether an MCP server exists for this framework"
+            },
+            "url": {
+              "type": ["string", "null"],
+              "format": "uri",
+              "description": "MCP server URL or repository"
+            },
+            "party": {
+              "type": ["string", "null"],
+              "enum": ["first-party", "third-party", "community", null],
+              "description": "Who maintains the MCP server"
+            }
+          }
+        },
+        "guidelines": {
+          "type": ["string", "null"],
+          "description": "Curated AI-facing guidelines, e.g. a Laravel Boost-style package"
+        },
+        "llms_txt": {
+          "type": ["boolean", "null"],
+          "description": "Whether the project publishes an llms.txt"
+        },
+        "style_guides": {
+          "type": ["string", "null"],
+          "description": "AI-specific style guides, if any"
+        },
+        "observed_delta": {
+          "type": ["string", "null"],
+          "description": "What changed when running the canonical exercise with this tooling active vs. without it — the actual before/after effect, not a binary exists/doesn't-exist checkbox"
+        }
+      }
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "description": "Framework name or filename of an older review this one replaces, when the reviewed thing is no longer the same framework as before (the Angular 1->2 problem)"
+    },
+    "superseded_by": {
+      "type": ["string", "null"],
+      "description": "Framework name or filename of a newer review that replaces this one"
     },
     "reviewed_date": {
       "type": ["string", "null"],
