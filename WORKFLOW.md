@@ -223,6 +223,13 @@ If you want a field to show up, make sure it has a value in the index:
 1. Edit the markdown frontmatter directly
 2. Run `npm run normalize && npm run sync && npm run index`
 
+## Ongoing Maintenance
+
+Keeping the corpus current is handled by two skills (see "Ongoing Maintenance" in
+`CLAUDE.md` for the map, and each skill's `SKILL.md` for its process):
+`/corpus-sweep` detects gaps and staleness; `/refresh-reviews` runs the accepted
+refresh queue through the research agent.
+
 ## Next Steps
 
 Once frontmatter is standardized and validated:

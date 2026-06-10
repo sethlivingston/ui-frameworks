@@ -438,3 +438,21 @@ When documenting a new framework:
 For the full research-agent brief — including the initial-vs-follow-on decision gate,
 verification-as-front-half-of-follow-on, and the AI-tooling delta-capture protocol —
 see `.claude/agents/framework-researcher.md`.
+
+## Ongoing Maintenance
+
+Two user-invocable skills keep the corpus current; each skill's `SKILL.md` owns its
+process detail — this is just the map:
+
+- **`/corpus-sweep`** (`.claude/skills/corpus-sweep/`) — periodic (~6-month)
+  detection pass: coverage gaps vs. the current landscape, plus mechanical staleness
+  checks (old `reviewed_date`, version drift vs. registries, tracked `next_release`s
+  that have shipped). Produces a findings file for human review; never dispatches
+  research itself.
+- **`/refresh-reviews`** (`.claude/skills/refresh-reviews/`) — runs an accepted
+  refresh queue: batched, sequential `framework-researcher` follow-on passes, with
+  per-batch pipeline runs, spot-checks, and commits.
+
+Sweeps feed refreshes; a refresh ends by recommending (not running) a rankings pass
+when scores moved enough to matter — `AGENTIC-DEV-RANKINGS.md`'s Methodology section
+is the canonical runbook for that.

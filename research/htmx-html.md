@@ -50,7 +50,7 @@ maintainer: "Big Sky Software / Community (BDFL: Carson Gross)"
 first_released: "2020"
 reviewed_date: "2026-06-08"
 reviewed_by_model: "Claude Sonnet 4.6"
-reviewer_notes: "Combo file per CLAUDE.md's combo-file convention: htmx has no rendering or component model of its own — it is a ~14KB attribute-driven extension of HTML's own request/response/swap model, and HTML is the only 'component model' it has. Scoring it standalone would manufacture rendering/state-management dimensions that don't exist for it. Note: research/htmx.md is a pre-9-dimension-rubric review (all *_score fields null, predates the ebc2a30 rubric migration) that AGENTIC-DEV-RANKINGS.md currently cites with a different (pre-migration, non-flat) scoring scheme — that file is queued for the from-scratch rewrite pass (V2-PHASE-B item 3) and is left untouched here as the pre-migration historical artifact; this combo file is the new, rubric-conformant entry for the htmx+HTML pairing and should be the one synthesis docs draw from going forward."
+reviewer_notes: "Combo file per CLAUDE.md's combo-file convention: htmx has no rendering or component model of its own — it is a ~14KB attribute-driven extension of HTML's own request/response/swap model, and HTML is the only 'component model' it has. Scoring it standalone would manufacture rendering/state-management dimensions that don't exist for it."
 ---
 
 # htmx + HTML
