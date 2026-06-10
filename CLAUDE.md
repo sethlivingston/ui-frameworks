@@ -158,7 +158,6 @@ On top of the per-framework reviews, the repo root holds a small set of synthesi
 - **README.md** - Entry point pointing visitors to the right document for what they need.
 - **AGENTIC-DEV-RANKINGS.md** - Ranks the reviewed frameworks/libraries for agentic development. Designed to be re-run periodically (its own Methodology section explains how) so that v1, v2, v3, etc. stay comparable over time.
 - **NEXT-GEN-FRAMEWORK.md** - Design principles for an AI-first UI framework, synthesized from the reviews.
-- **LANGUAGE-DESIGN.md** - A companion language proposal (StrictTS) for pairing with the framework design.
 
 **Writing guidance for these (and any future periodically-updated synthesis doc):** because they get revisited and re-run every several months, avoid prose that's tied to the moment it was written:
 - No hardcoded counts that will drift ("24 frameworks," "18 entries") - reference the directory or describe the set instead.

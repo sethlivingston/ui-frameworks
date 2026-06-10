@@ -1,6 +1,6 @@
 # Next-Gen AI-First UI Framework
 
-This document synthesizes findings from 24 framework reviews to define design principles for a next-generation UI framework optimized for AI-assisted development.
+This document synthesizes findings from the framework reviews in [`/research`](./research/) to define design principles for a next-generation UI framework optimized for AI-assisted development.
 
 > **Philosophy**: Humans come second. This framework is designed for AI to read, write, and reason about. Human ergonomics are a secondary concern.
 
@@ -8,46 +8,51 @@ This document synthesizes findings from 24 framework reviews to define design pr
 
 ## Research Summary
 
-Based on analysis of 24 frameworks/libraries, scored on AI-friendliness (0-10):
+Every review in `/research` scores its framework on the flat 9-dimension agentic-dev rubric (see [AGENTIC-DEV-RANKINGS.md](./AGENTIC-DEV-RANKINGS.md) for the dimensions, weights, and full ranked tables). The headline weighted totals put compiler-verified, high-locality designs on top:
 
-| Top Performers | Score | Key Strength |
-|----------------|-------|--------------|
-| Phoenix LiveView | 9.5 | Explicit data flow, single language, pattern matching |
-| Elm | 9.0 | Compiler guarantees, no runtime exceptions, pure functions |
-| SvelteKit | 9.0 | File-based conventions, clear server/client boundary |
-| Remix | 8.5 | Progressive enhancement, web standards |
-| Astro | 8.5 | Explicit file types, islands architecture |
-| Zustand | 8.5 | Minimal API (5 functions), no magic |
-| htmx | 8.5 | Declarative HTML attributes, greppable |
+| Top Performers | Weighted | Key Strength (per the rubric evidence) |
+|----------------|----------|----------------------------------------|
+| Elm | 8.06 | Type-system + compiler feedback near-perfect (9.5/9.5) — "if it compiles, it works," with errors written to teach the fix |
+| Svelte | 8.01 | Best locality in the corpus (9.5) — one `.svelte` file holds a feature; runes make state language-level (token efficiency 9.0) |
+| Jotai / Zustand / TanStack Query | 7.87–7.89 | Statistical three-way tie atop the state-library list: one-place state, near-zero boilerplate, explicit boundaries |
+| Solid | 7.65 | Signals make the dependency graph literal (explicitness 8.5, locality 9.0) |
+| Remix | 7.54 | loader → component → action convention: one route file shows how data arrives, renders, mutates |
+| Phoenix LiveView | 7.46 | The corpus's explicitness champion (9.5) — every state change traceable, single language end to end |
+
+Equally instructive are the per-dimension extremes the totals smooth over: Phoenix's explicitness (9.5) coexists with Elixir's dynamic-typing ceiling (type-system 5.5); htmx+HTML posts elite locality and token efficiency (9.5/9.0) with almost no machine-checked layer (2.0–2.5); React's perfect familiarity (10.0) coexists with weak conventions (5.0). No existing framework is strong on all nine at once — that's the gap this document designs into.
 
 ---
 
-## Top AI-Friendliness Patterns
+## Patterns the Rubric Rewards
 
-| Pattern | Source | Why AI Loves It |
-|---------|--------|-----------------|
-| **Explicit data flow** | Phoenix, Elm, Jotai | Every state change traceable through explicit paths |
-| **Pure functions + immutability** | Elm, Phoenix | Same inputs = same outputs, no side effects |
-| **Pattern matching** | Elm, Elixir | Self-documenting code structure |
-| **Single language** | Phoenix (Elixir), Elm | No context switching between client/server |
-| **Declarative bindings** | Phoenix (`phx-*`), htmx (`hx-*`) | Greppable, scannable, predictable |
-| **Minimal API surface** | Zustand (5 functions), Jotai | Learn entire API in seconds |
-| **Compiler guarantees** | Elm, Svelte | If it compiles, it works |
-| **File-based conventions** | SvelteKit, Astro | Intent obvious from filename |
+Re-derived from the `### Evidence:` sections of the current reviews — each pattern names the dimension(s) it wins on:
+
+| Pattern | Source | Rubric dimension(s) it wins | Why it helps an agent |
+|---------|--------|-----------------------------|------------------------|
+| **Compiler as teammate** | Elm (9.5/9.5), Angular (9.0/8.5) | Type-system, compiler feedback (30% combined weight) | The fastest feedback rung an autonomous loop can iterate against — errors that name the fix |
+| **Explicit data flow** | Phoenix (9.5), Elm (9.5), Solid (8.5) | Explicitness | Every state change traceable from trigger to render with no invisible hops |
+| **Single-file features** | Svelte (9.5), htmx+HTML (9.5), Phoenix (9.0), Zustand (9.0) | Locality | Understanding or changing one feature means opening one file |
+| **One obvious way** | Elm (9.5), SvelteKit (8.5), Remix (8.0) | Convention strength | Shrinks the space of valid approaches an agent must guess among |
+| **Minimal API surface** | Zustand (9.0), Svelte runes (9.0), Jotai (8.5) | Token efficiency | A feature costs few tokens to write and few to hold in view across a long session |
+| **Declarative, greppable bindings** | Phoenix (`phx-*`), htmx (`hx-*`) | Locality + explicitness | Behavior is findable by exact text search, not by tracing handler registration |
+| **Named conceptual boundaries** | TanStack Query ("server state ≠ client state") | Explicitness, convention | An explicit boundary gives the agent a clean place to reason from |
+| **File-based conventions** | SvelteKit, Astro | Convention strength | Intent obvious from filename — though SvelteKit's evidence shows the locality cost (5.5) of spreading one feature across `+page.*` files; conventions should not *require* file-scatter |
 
 ---
 
 ## Anti-Patterns to Avoid
 
-| Anti-Pattern | Source | Why It Creates Friction |
-|--------------|--------|------------------------|
-| **Implicit reactivity** | MobX | "Magic" that hides data flow |
-| **Manual optimization** | React (memo, useMemo) | Subtle, easy to get wrong |
-| **Dependency arrays** | React useEffect | Common source of bugs |
-| **Stale closures** | React | Requires understanding JS semantics |
-| **Multiple strategies** | Next.js (SSR/SSG/ISR) | Too many execution contexts |
-| **Decorator magic** | Angular | Hides behavior |
-| **Framework caching** | Next.js | Abstraction that's hard to reason about |
+Each one now has a price tag in the corpus — the dimension score that penalizes it:
+
+| Anti-Pattern | Source (score it drags) | Why It Creates Friction |
+|--------------|------------------------|------------------------|
+| **Implicit reactivity** | MobX (explicitness 5.0) | A render re-runs because a proxy recorded a property read — an invisible hop an agent can't grep for |
+| **Auto-imports / ambient magic** | Nuxt (explicitness 5.0, locality 5.5) | Symbols appear from nowhere; dependencies aren't declared where they're used |
+| **Convention sprawl** | Next.js (convention 3.5), React (5.0), Vanilla JS (1.0) | Multiple coexisting idioms for the same task force the agent to guess which one this codebase chose |
+| **File-scatter architectures** | Angular (locality 4.5), Redux Toolkit (4.5), Next.js (4.5) | One feature spread across module/component/slice/route files multiplies what must be loaded to change anything |
+| **Manual render optimization** | React (memo/useMemo/dependency arrays; convention 5.0) | Subtle, easy to get wrong, and the failure mode is silent staleness rather than an error |
+| **Formalism tax** | XState (token efficiency 4.0, convention 4.5) | Explicitness bought with heavyweight ceremony — the official TodoMVC runs ~10× Zustand's line count |
+| **Opaque framework caching** | Next.js (stability 4.5, explicitness 5.0) | Behavior depends on cache defaults that have churned across releases — unreasonable to reason about |
 
 ---
 
@@ -62,7 +67,7 @@ Based on analysis of 24 frameworks/libraries, scored on AI-friendliness (0-10):
 | **Context window** | Models forget; locality of behavior is survival-critical | 1M-token windows (Opus 4.8, Sonnet 4.6) hold ~20-100 source files at once — effectively a whole small codebase | Locality of behavior becomes a **performance/cost** concern, not a correctness one. Designs that span files are workable as long as the model can still load them all. |
 | **Agentic coding** | Models write code blind; compile-time guarantees are the *only* defense against errors | Models now run code, execute tests, read failures, and iterate autonomously in long-horizon agentic loops | Compiler guarantees stay valuable as the *fastest* feedback signal, but they're one rung on a ladder that now also includes test-driven self-correction. A framework that's pleasant to **iterate against** matters as much as one that's hard to get wrong on the first try. |
 | **Extended/adaptive thinking** | Models pattern-match; anything not spelled out is "magic" they can't see through | Adaptive thinking lets models reason through *why* code is shaped the way it is before writing more of it | Some implicit patterns become *safely* implicit — a coherent, well-motivated convention can now be derived by a reasoning model rather than requiring explicit restatement everywhere. This narrows, but does not erase, the gap between "explicit" and "well-designed implicit." |
-| **Novel-language generalization** | A brand-new DSL pays a steep accuracy tax versus mainstream languages | The novelty penalty has shrunk to roughly 10-20% (from an estimated 50%+) given a clear spec and a handful of examples | Inventing a new language (StrictTS) is still defensible — though a TypeScript **subset/extension** remains the lower-risk path, since models already carry deep TypeScript priors that a from-scratch syntax can't borrow. |
+| **Novel-language generalization** | A brand-new DSL pays a steep accuracy tax versus mainstream languages | The novelty penalty has shrunk to roughly 10-20% (from an estimated 50%+) given a clear spec and a handful of examples | Inventing a new language is still defensible — though a TypeScript **subset/extension** remains the lower-risk path, since models already carry deep TypeScript priors that a from-scratch syntax can't borrow. |
 | **Long-running agentic sessions** | Each generation is roughly a single shot | Persistent sessions, memory stores, and multi-turn refinement loops are now standard agentic tooling | Framework ergonomics should assume **generate → test → refine** cycles, not single-pass perfection. Error messages that steer an autonomous agent toward the fix are now a first-class design surface, not a courtesy to humans. |
 
 ### Principles that get *stronger*
@@ -77,9 +82,9 @@ Based on analysis of 24 frameworks/libraries, scored on AI-friendliness (0-10):
 - **Compiler-enforced correctness** remains a pillar, but shifts from "the only safety net" to "the fastest rung on a ladder that also includes test execution and runtime verification." Build the framework to be fast and pleasant to **test against**, not only hard to compile incorrectly.
 - **Locality of behavior** matters less as an anti-forgetting mechanism and more as a **cost/latency** lever — keeping what an agent must load lean still saves tokens and wall-clock time, it's just no longer the line between "the model understands this" and "it doesn't."
 
-### Bottom line for StrictTS
+### Bottom line for a companion language
 
-The gap analysis below — "nothing in TypeScript/JavaScript combines all the best patterns" — still holds, and the case for StrictTS survives the 2026 capability jump intact. If anything, stronger reasoning models make an Option/Result-flavored TypeScript *easier* to teach a model, not harder: adaptive thinking means a model can work through *why* `match` must be exhaustive, rather than needing that drilled in by repetition. The adjustment to make: don't over-invest in the compiler as the sole correctness story. Give the compiler's errors and the runtime test loop equal billing, and write error messages as something an autonomous agent reads and *acts on* — not just something a human reads and understands.
+The gap analysis below — "nothing in TypeScript/JavaScript combines all the best patterns" — still holds, and the case for a stricter, Option/Result-flavored TypeScript survives the 2026 capability jump intact. If anything, stronger reasoning models make an Option/Result-flavored TypeScript *easier* to teach a model, not harder: adaptive thinking means a model can work through *why* `match` must be exhaustive, rather than needing that drilled in by repetition. The adjustment to make: don't over-invest in the compiler as the sole correctness story. Give the compiler's errors and the runtime test loop equal billing, and write error messages as something an autonomous agent reads and *acts on* — not just something a human reads and understands.
 
 ---
 
@@ -96,7 +101,7 @@ The gap analysis below — "nothing in TypeScript/JavaScript combines all the be
 | **Qwik** | Qwik 2.0 (beta): near-rewrite — new package scope (`@qwik.dev/*`), no comment-node serialization, new primitives (`useAsyncComputed$`, `worker$`) | Resumability story extends into async state and workers; component-model details in the review will likely be stale post-2.0 |
 | **htmx** | htmx 4.0 (beta): replaces `XMLHttpRequest` with `fetch()`, makes attribute inheritance **explicit** via `:inherited` (was implicit), changes back-button handling | The `:inherited` change *strengthens* exactly the explicitness this project values in htmx — inheritance becomes greppable instead of inferred |
 | **Laravel Livewire** | Livewire v4 (shipped Jan 2026): parallel live updates, `wire:transition`, and an "Islands" feature for isolating reactive regions | Islands narrows *what* re-renders in a way that echoes Phoenix LiveView's explicit-data-flow strength — closes some of the gap between the two |
-| **Astro** | Astro 6.0 (shipped Mar 2026): experimental Rust compiler, Vite-Environment-API rewrite of the build pipeline, Fonts/CSP APIs, Live Content Collections | Tooling/performance overhaul under the same Islands philosophy — the AI-friendliness analysis is unaffected, this is plumbing |
+| **Astro** | Astro 6.0 (shipped Mar 2026): experimental Rust compiler, Vite-Environment-API rewrite of the build pipeline, Fonts/CSP APIs, Live Content Collections | Tooling/performance overhaul under the same Islands philosophy — the agentic-dev analysis is unaffected, this is plumbing |
 | **Next.js** | Next.js 16.2 (Mar 2026): 25-60% faster HTML rendering, Turbopack maturation, experimental Rust compiler, new Fonts/CSP APIs | Performance and tooling, not a paradigm shift — the "multiple strategies" anti-pattern noted in the original review is unchanged |
 | **TC39 Signals proposal** | Still **Stage 1** as of mid-2026 — no native browser implementation shipping | The "native reactivity primitive that could obsolete framework-level signals" the vanilla-js review was watching for hasn't materialized; framework-level signals remain the only game in town |
 
@@ -217,11 +222,21 @@ From Remix/htmx: Works without JavaScript. AI can reason about fallback behavior
 
 ## Expected Scores
 
-| Metric | Expected Score | Reason |
-|--------|---------------|--------|
-| **AI-Friendliness** | 10/10 | Designed from ground-up for AI |
-| **Reusability** | 9/10 | Single-file views are portable |
-| **Maintainability** | 9.5/10 | Compiler catches everything |
+Scored against the same 9-dimension rubric the corpus uses (weights in [AGENTIC-DEV-RANKINGS.md](./AGENTIC-DEV-RANKINGS.md)), so the hypothetical can be compared honestly against the real entries:
+
+| Dimension | Target | Reason |
+|-----------|--------|--------|
+| Type-system integration | 9.5 | A stricter TypeScript: no null/undefined, exhaustive matching — Elm's guarantees in TypeScript's syntax |
+| Compiler/build feedback | 9.5 | Error messages designed as agent instructions, not human prose |
+| Locality of behavior | 9.0 | Single-file views: state, events, render in one place |
+| Explicitness | 9.5 | Zero hidden subscriptions; every dependency visible in code |
+| Convention strength | 9.5 | One way to do each task, enforced by the compiler rather than lint advice |
+| Token efficiency | 8.5 | Minimal API, but explicit state declarations cost more than `atom(0)` |
+| Familiarity | ~4 | The honest weak spot: a new framework has zero pretraining presence — mitigated (not erased) by building on TypeScript priors |
+| Stability | 6 | New frameworks churn; conventions can't be "durable" until they've survived contact with users |
+| Tooling | ~4 | Devtools/test-utils/LSP all start from zero at launch |
+
+Weighted total at those targets: **~8.4** — above Elm's 8.06, but only barely, *because* familiarity and tooling are weighted realities a new framework cannot design its way out of. That's the sober version of the pitch: perfect design scores buy roughly a half-point over Elm; the rest has to be earned by adoption and time. (It's also the argument for building on TypeScript rather than from scratch — familiarity is the one dimension where inheritance is possible.)
 
 ---
 
@@ -231,7 +246,7 @@ From Remix/htmx: Works without JavaScript. AI can reason about fallback behavior
 |--------------|-----------|
 | **Phoenix LiveView** | TypeScript instead of Elixir (more AI training data) |
 | **Elm** | Practical compromise between purity and productivity |
-| **Svelte** | More explicit (no `$:` magic), co-located state |
+| **Svelte** | More explicit (runes are still compiler-rewritten semantics), co-located state |
 | **React** | No hooks rules, no dependency arrays, no stale closures |
 | **htmx** | Full framework, not just progressive enhancement |
 
@@ -239,12 +254,12 @@ From Remix/htmx: Works without JavaScript. AI can reason about fallback behavior
 
 ## Gap Analysis
 
-The research shows a clear gap:
+The research shows a clear gap — every top-ranked entry is missing at least one dimension the others have:
 
-1. **Phoenix LiveView** (9.5) is excellent but requires Elixir adoption
-2. **Elm** (9.0) is pure but has limited ecosystem and is a new language
-3. **Svelte** (9.0) is close but still has compiler magic that hides behavior
-4. **Nothing in TypeScript/JavaScript** combines all the best patterns
+1. **Elm** (8.06, #1 overall) has the compiler story this document wants, but pays familiarity 3.5 — a new-to-the-model language with a small corpus
+2. **Svelte** (8.01) has the locality and token efficiency, but its compiler magic (runes rewriting semantics) trades away some of Elm's explicitness, and its type story stops short of "no runtime exceptions"
+3. **Phoenix LiveView** (7.46) is the explicitness champion (9.5), but requires Elixir adoption *and* caps at type-system 5.5 — dynamic typing undercuts the verify-before-runtime loop
+4. **Nothing in TypeScript/JavaScript** combines all of the best patterns — the TS-native entries that win on types (Angular 9.0, Next.js 8.5, TanStack Start 8.5) all lose badly on locality or conventions
 
 **The sweet spot**: A TypeScript framework that takes:
 - **Data flow explicitness** from Phoenix/Elm
@@ -268,13 +283,9 @@ The research shows a clear gap:
 
 ---
 
-## Related Documents
-
-- **[LANGUAGE-DESIGN.md](./LANGUAGE-DESIGN.md)** - StrictTS language specification (TypeScript without null/undefined)
-
 ## Next Steps
 
-1. Define the language/syntax specification - see [LANGUAGE-DESIGN.md](./LANGUAGE-DESIGN.md)
+1. Define the language/syntax specification
 2. Build a minimal compiler prototype
 3. Implement core primitives (state, events, rendering)
 4. Create example applications

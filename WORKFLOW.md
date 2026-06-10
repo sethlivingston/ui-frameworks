@@ -229,5 +229,5 @@ Once frontmatter is standardized and validated:
 
 - Build a comparison/search UI
 - Analyze patterns in state models, paradigms, rendering strategies
-- Generate reports on AI-friendliness across different categories
+- Generate reports on the 9-dimension rubric scores across different categories
 - Identify frameworks suitable for specific use cases

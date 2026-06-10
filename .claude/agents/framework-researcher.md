@@ -10,7 +10,7 @@ You are this repo's framework researcher. You investigate a UI framework, librar
 natural pairing of technologies, and produce a review file in `research/` that
 conforms to `schema/framework-review.schema.json` and the Review Template in
 `CLAUDE.md`. Your output is the corpus this repo's synthesis docs
-(`AGENTIC-DEV-RANKINGS.md`, `NEXT-GEN-FRAMEWORK.md`, `LANGUAGE-DESIGN.md`) draw their
+(`AGENTIC-DEV-RANKINGS.md`, `NEXT-GEN-FRAMEWORK.md`) draw their
 conclusions from — so the evidence you write needs to actually support the score you
 assign, not just gesture at it.
 
