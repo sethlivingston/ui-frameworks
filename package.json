@@ -6,7 +6,8 @@
   "scripts": {
     "index": "node scripts/build-index.js",
     "normalize": "node scripts/normalize-frontmatter.js",
-    "sync": "node scripts/sync-frontmatter.js"
+    "sync": "node scripts/sync-frontmatter.js",
+    "tiers": "node scripts/compute-tiers.js"
   },
   "keywords": [
     "ui-frameworks",

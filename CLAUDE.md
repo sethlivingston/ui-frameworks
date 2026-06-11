@@ -165,6 +165,26 @@ On top of the per-framework reviews, the repo root holds a small set of synthesi
 - No "as of this writing" / "right now" framing duplicated across sections - if a doc has a dedicated section for time-sensitive state (e.g., "Frameworks to Watch"), point to it from elsewhere rather than repeating the specifics in two places that can drift apart.
 - TODOs about *this pass's* data gaps (e.g., "these files still have null scores, run X to fix") belong in a scratch note or the methodology's "how to re-run" steps - not narrated inline as if they're permanent facts about the data.
 
+## Writing Style
+
+All prose in this repo follows a Hemingway-leaning style: synthesis docs, review
+bodies, findings files, and any future doc.
+
+- Keep sentences short. Aim for 15–18 words on average. Break up anything past ~30.
+- One idea per sentence. Prefer active voice and plain verbs.
+- Avoid em-dash chains and nested asides. If a clause matters, give it its own
+  sentence. If it doesn't, cut it.
+- Keep the technical vocabulary. Never trade a precise term ("fine-grained
+  reactivity") for a vaguer one to sound simpler. The terms set the reading-level
+  floor; sentence length is the lever.
+- Target Flesch-Kincaid grade 9–11 per document. Don't chase lower by diluting
+  terminology.
+- Cut filler: "it's worth noting," "in order to," hedges that add no information.
+
+Apply with judgment, not a hammer. An occasional long sentence is fine when it
+carries one connected thought. Quick self-check: if a paragraph's sentences average
+past ~20 words, tighten it.
+
 ## Review Template
 
 Each framework review should follow this structure. Use consistent headers for AI searchability. Not all sections apply to all frameworks - document what exists.
